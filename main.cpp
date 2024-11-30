@@ -1,7 +1,7 @@
 /*
 Author: Pulkit Goel
 Class: ECE6122 (section)
-Last Date Modified: 10/26/2024
+Last Date Modified: 11/28/2024
 Description:
 main function for game of chess
 */
@@ -11,6 +11,9 @@ main function for game of chess
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
+#include <iostream>
+#include <sstream>
+#include <string>
 
 // Include GLEW
 #include <GL/glew.h>
@@ -28,6 +31,8 @@ using namespace glm;
 #include "assimp_model.h"
 //#include "texture.h"
 
+#include "Windows.h"
+
 /*
 #include <map>
 #include <string>
@@ -43,22 +48,61 @@ using namespace glm;
 #include <cmath> 
 */
 
-// Include Windows headers for process and pipe management
-#include <windows.h>
+using namespace std;
 
 //Some global functions and variables
 
+
 // Camera parameters
-float cameraRadius = 50.0f;
-float horizontalAngle = glm::pi<float>();
-float verticalAngle = glm::radians(-20.0f);
-bool specularDiffuseEnabled = true;
+struct camera
+{
+    float radius = 50.0f;
+    float horizontalAngle = glm::radians(0.0f);
+    float verticalAngle = glm::radians(20.0f);
+
+    float x = 17.1;
+    float y = 0.0;
+    float z = 47.0;
+
+    
+    void get_Cartesian()
+    {
+        x = radius * cos(verticalAngle) * sin(horizontalAngle);
+        y = radius * sin(verticalAngle);
+        z = radius * cos(verticalAngle) * cos(horizontalAngle);
+    }
+
+    //bool specularDiffuseEnabled = true;
+} camera;
+
+// Light parameters
+struct light
+{
+    float radius;
+    float horizontalAngle;
+    float verticalAngle;
+    
+    //Values here are cartesian
+    float x = 5.0;
+    float y = 25.0;
+    float z = 5.0;
+
+    void get_Cartesian()
+    {
+        x = radius * cos(verticalAngle) * sin(horizontalAngle);
+        y = radius * sin(verticalAngle); 
+        z = radius * cos(verticalAngle) * cos(horizontalAngle);
+    }
+
+    float power = 600.0f;
+    bool specularDiffuseEnabled = true;
+} light;
 
 //Render the pieces
 void renderPieces(std::vector<glm::vec3> piecePosition, GLuint ModelMatrixID, GLuint MatrixID, GLuint ColorID, CAssimpModel pieceModel, bool isWhite)
 {
     // Compute the camera position in Cartesian coordinates
-    glm::vec3 positionCamera = glm::vec3(cameraRadius * cos(verticalAngle) * sin(horizontalAngle), cameraRadius * sin(verticalAngle), cameraRadius * cos(verticalAngle) * cos(horizontalAngle));   
+    glm::vec3 positionCamera = glm::vec3(camera.x, camera.y, camera.z);
     // Camera looks at the origin
     glm::vec3 targetCamera = glm::vec3(0.0f, 0.0f, 0.0f);
     // Up vector
@@ -69,6 +113,7 @@ void renderPieces(std::vector<glm::vec3> piecePosition, GLuint ModelMatrixID, GL
         targetCamera,
         upVector
     );
+
     //Projection matrix
     glm::mat4 ProjectionMatrix = glm::perspective(
         glm::radians(60.0f),
@@ -112,7 +157,7 @@ void renderPieces(std::vector<glm::vec3> piecePosition, GLuint ModelMatrixID, GL
 }
 
 // Function to handle camera inputs
-void keyBinds() {
+/*void keyBinds() {
     // Camera speed
     float cameraSpeed = 0.05f;
     float rotationSpeed = 0.002f;
@@ -176,6 +221,94 @@ void keyBinds() {
         glfwSetWindowShouldClose(window, true);
     }
 }
+*/
+ 
+
+//EDIT HERE
+void parse(string in, GLuint programID)
+{
+    if (in == "quit")
+    {
+        std::cout << "Thanks for playing!!";
+        glfwSetWindowShouldClose(window, true);
+    }
+    else if (in.substr(0, 6) == "camera") 
+    {
+        float theta = 0.0f, phi = 0.0f, r = 0.0f;
+        if (sscanf_s(in.c_str(), "camera %f %f %f", &theta, &phi, &r) != 3) 
+        {
+            std::cerr << "Some issue with input" << in<<std::endl;
+            return;
+        }
+        // Enforce ranges
+        if (r <= 0.0f) 
+        {
+            std::cerr << "Radius cant be negative" << std::endl;
+            return;
+        }
+        if (theta < 20.0f || theta > 80.0f)
+        {
+            std::cerr << "Theta (Horizontal Angle) must be between 20 and 80 degrees" << std::endl;
+            return;
+        }
+        if (phi < 0.0f || phi > 360.0f)
+        {
+            std::cerr << "Phi (Vertical Angle) must be between 0 and 360 degrees" << std::endl;
+            return;
+        }
+        camera.horizontalAngle = glm::radians(theta);
+        camera.verticalAngle = glm::radians(phi);
+        camera.radius = r;
+        camera.get_Cartesian();
+    }
+
+    else if (in.substr(0, 5) == "light")
+    {
+        float theta = 0.0f, phi = 0.0f, r = 0.0f;
+        if (sscanf_s(in.c_str(), "light %f %f %f", &theta, &phi, &r) != 3)
+        {
+            std::cerr << "in issue " << in << std::endl;
+            return;
+        }
+        // Enforce ranges
+        if (r <= 0.0f)
+        {
+            std::cerr << "Radius cant be negative" << std::endl;
+            return;
+        }
+        if (theta < 20.0f || theta > 80.0f)
+        {
+            std::cerr << "Theta (Horizontal Angle) must be between 20 and 80 degrees" << std::endl;
+            return;
+        }
+        if (phi < 0.0f || phi > 360.0f)
+        {
+            std::cerr << "Phi (Vertical Angle) must be between 0 and 360 degrees" << std::endl;
+            return;
+        }
+        light.horizontalAngle = glm::radians(theta);
+        light.verticalAngle = glm::radians(phi);
+        light.radius = r;
+        light.get_Cartesian();
+
+        GLuint LightID = glGetUniformLocation(programID, "LightPosition_worldspace"); 
+        glUniform3f(LightID, light.x, light.y, light.z);
+    }
+    else if (in.substr(0, 5) == "power")
+    {
+        float pow = 0.0f;
+        if (sscanf_s(in.c_str(), "power %f", &pow) != 1)
+        {
+            std::cerr << "Invalid Comamnd -> Power " << in << std::endl;
+            return;
+        }
+        light.power = pow;
+    }
+    else
+    {
+        std::cout << "Invalid command or move!!\n";
+    }
+}
 
 bool loadModel(CAssimpModel& model, char* filePath) 
 {
@@ -234,7 +367,7 @@ int main(void) {
     glEnable(GL_CULL_FACE);
     // Load the chessboard model
     CAssimpModel chessboardModel;
-    if (!chessboardModel.LoadModelFromFile("../Lab3/Stone_Chess_Board/12951_Stone_Chess_Board_v1_L3.obj")) 
+    if (!chessboardModel.LoadModelFromFile("../ChessGame/Stone_Chess_Board/12951_Stone_Chess_Board_v1_L3.obj")) 
     {
         fprintf(stderr, "Failed to load chessboard OBJ file!!\n");
         getchar();
@@ -244,32 +377,32 @@ int main(void) {
 
     //Load pieces model using the function defined
     CAssimpModel pawnModel;
-    if (!loadModel(pawnModel, "../Lab3/Chess/pawn.obj")) 
+    if (!loadModel(pawnModel, "../ChessGame/Chess/pawn.obj")) 
     {
         return -1;
     }
     CAssimpModel kingModel;
-    if (!loadModel(kingModel, "../Lab3/Chess/king.obj"))
+    if (!loadModel(kingModel, "../ChessGame/Chess/king.obj"))
     {
         return -1;
     }
     CAssimpModel queenModel;
-    if (!loadModel(queenModel, "../Lab3/Chess/queen.obj"))
+    if (!loadModel(queenModel, "../ChessGame/Chess/queen.obj"))
     {
         return -1;
     }
     CAssimpModel rookModel;
-    if (!loadModel(rookModel, "../Lab3/Chess/rook.obj"))
+    if (!loadModel(rookModel, "../ChessGame/Chess/rook.obj"))
     {
         return -1;
     }
     CAssimpModel knightModel;
-    if (!loadModel(knightModel, "../Lab3/Chess/knight.obj"))
+    if (!loadModel(knightModel, "../ChessGame/Chess/knight.obj"))
     {
         return -1;
     }
     CAssimpModel bishopModel;
-    if (!loadModel(bishopModel, "../Lab3/Chess/bishop.obj"))
+    if (!loadModel(bishopModel, "../ChessGame/Chess/bishop.obj"))
     {
         return -1;
     }
@@ -287,6 +420,9 @@ int main(void) {
     GLuint LightID = glGetUniformLocation(programID, "LightPosition_worldspace");
     GLuint SpecularDiffuseEnabledID = glGetUniformLocation(programID, "specularDiffuseEnabled");
     GLuint ColorID = glGetUniformLocation(programID, "pieceColor");
+
+    GLuint lightPower = glGetUniformLocation(programID, "LightPower");
+
 
     // For frame timing
     double lastTime = glfwGetTime();
@@ -344,6 +480,11 @@ int main(void) {
     blackKnight.push_back(glm::vec3(-halfChessBoardSize + boxSize / 2 + 6 * boxSize, 0.0f, -halfChessBoardSize + 0.5f * boxSize));
     blackRook.push_back(glm::vec3(-halfChessBoardSize + boxSize / 2 + 7 * boxSize, 0.0f, -halfChessBoardSize + 0.5f * boxSize));
 
+    string in;
+
+    // Set the light position
+    glUniform3f(LightID, light.x, light.y, light.z);
+
     // Main rendering loop
     do 
     {
@@ -360,16 +501,17 @@ int main(void) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // Handle camera inputs
-        keyBinds();
+        //keyBinds();
 
         // Use our shader
         glUseProgram(programID);
         
         // Compute the camera position in Cartesian coordinates
         glm::vec3 positionCamera;
-        positionCamera.x = cameraRadius * cos(verticalAngle) * sin(horizontalAngle);
-        positionCamera.y = cameraRadius * sin(verticalAngle);
-        positionCamera.z = cameraRadius * cos(verticalAngle) * cos(horizontalAngle);
+        camera.get_Cartesian();
+        positionCamera.x = camera.x;
+        positionCamera.y = camera.y;
+        positionCamera.z = camera.z;
         
         // Camera looks at the origin
         glm::vec3 targetCamera = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -394,10 +536,9 @@ int main(void) {
         
 // Set common uniforms
         glUniformMatrix4fv(ViewMatrixID, 1, GL_FALSE, &ViewMatrix[0][0]);
-        glUniform1i(SpecularDiffuseEnabledID, specularDiffuseEnabled ? 1 : 0);
+        glUniform1i(SpecularDiffuseEnabledID, light.specularDiffuseEnabled ? 1 : 0);
+        glUniform1f(lightPower, light.power);
 
-// Set the light position
-        glUniform3f(LightID, 5, 25, 5);
 
 // Chessboard rendering
         {
@@ -439,6 +580,12 @@ int main(void) {
         // Swap buffers
         glfwSwapBuffers(window);
         glfwPollEvents();
+
+        cout << "Please enter a command: ";
+        std::getline(std::cin, in);
+
+        //Parse the string input
+        parse(in, programID);
 
     } while (!glfwWindowShouldClose(window));
 

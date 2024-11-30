@@ -13,6 +13,7 @@ uniform mat4 MV;                       // Model-view matrix
 uniform vec3 LightPosition_worldspace; // Light position
 
 uniform int lightOn;
+uniform float LightPower;
 
 // New uniform for piece color
 uniform vec4 pieceColor; // Add this line
@@ -21,7 +22,7 @@ uniform int specularDiffuseEnabled;
 void main() {
     // Light emission properties
     vec3 LightColor = vec3(1, 1, 1);
-    float LightPower = 600.0f;
+//    float LightPower = 600.0f;
     
     // Material properties
     vec3 MaterialDiffuseColor = texture2D(myTextureSampler, UV).rgb;
