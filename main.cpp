@@ -14,23 +14,12 @@ main function for game of chess
 #include <iostream>
 #include <sstream>
 #include <string>
-
-// Include GLEW
 #include <GL/glew.h>
-
-// Include GLFW
 #include <glfw3.h>
 GLFWwindow* window;
-
-// Include GLM
-//#include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 using namespace glm;
-
-
 #include "assimp_model.h"
-//#include "texture.h"
-
 #include "Windows.h"
 
 /*
@@ -45,13 +34,26 @@ using namespace glm;
 #include <chrono>
 #include <condition_variable>
 #include <memory>
-#include <cmath> 
+#include <cmath>
 */
 
 using namespace std;
 
 //Some global functions and variables
+//Get constant values for setting up positions
+float boxSize = 18.0f; // Size of each square
+float ChessBoardSize = boxSize * 8;
+float halfChessBoardSize = ChessBoardSize / 2.0f;
+int start = 0;
+bool specularDiffuseEnabled = true;
 
+//z for now
+//will use only 95 to 104
+float files[105];
+
+//x axis
+//took 0 as spare
+float ranks[9];
 
 // Camera parameters
 struct camera
@@ -64,12 +66,12 @@ struct camera
     float y = 0.0;
     float z = 47.0;
 
-    
+
     void get_Cartesian()
     {
-        x = radius * cos(verticalAngle) * sin(horizontalAngle);
-        y = radius * sin(verticalAngle);
-        z = radius * cos(verticalAngle) * cos(horizontalAngle);
+        x = radius * sin(verticalAngle) * cos(horizontalAngle);
+        y = radius * cos(verticalAngle);
+        z = radius * sin(verticalAngle) * sin(horizontalAngle);
     }
 
     //bool specularDiffuseEnabled = true;
@@ -78,28 +80,181 @@ struct camera
 // Light parameters
 struct light
 {
-    float radius;
-    float horizontalAngle;
-    float verticalAngle;
-    
+    float radius = 25.0f;
+    float horizontalAngle = glm::radians(25.0f);
+    float verticalAngle = glm::radians(25.0f);
+
     //Values here are cartesian
-    float x = 5.0;
+    float x = 25.0;
     float y = 25.0;
-    float z = 5.0;
+    float z = 25.0;
 
     void get_Cartesian()
     {
-        x = radius * cos(verticalAngle) * sin(horizontalAngle);
-        y = radius * sin(verticalAngle); 
-        z = radius * cos(verticalAngle) * cos(horizontalAngle);
+        x = radius * sin(verticalAngle) * cos(horizontalAngle);
+        y = radius * cos(verticalAngle);
+        z = radius * sin(verticalAngle) * sin(horizontalAngle);
     }
 
-    float power = 600.0f;
-    bool specularDiffuseEnabled = true;
+    float power = 3000.0f;
+    //bool specularDiffuseEnabled = true;
 } light;
 
+//Components for 1 piece
+struct piece
+{
+    glm::vec3 name;
+    float xPos = 0.0f;
+    float yPos = 0.0f;
+    float zPos = 0.0f;
+
+    char file = 'a';
+    int rank = 1;
+
+    glm::vec3 pos = glm::vec3(xPos, yPos, zPos);
+
+    bool isWhite = true;
+};
+
+struct models
+{
+    CAssimpModel pawnModel;
+    CAssimpModel rookModel;
+    CAssimpModel knightModel;
+    CAssimpModel bishopModel;
+    CAssimpModel queenModel;
+    CAssimpModel kingModel;
+} pieceModels;
+
+//Struct for all chess pieces
+struct allPieces
+{
+    //Black pieces
+    piece blackPawn1;
+    piece blackPawn2;
+    piece blackPawn3;
+    piece blackPawn4;
+    piece blackPawn5;
+    piece blackPawn6;
+    piece blackPawn7;
+    piece blackPawn8;
+
+    piece blackRook1; //Elephant
+    piece blackKnight1; //Horse
+    piece blackBishop1; //Camel
+    piece blackQueen;
+    piece blackKing;
+    piece blackBishop2;
+    piece blackKnight2; 
+    piece blackRook2;
+
+    //white pieces
+    piece whitePawn1;
+    piece whitePawn2;
+    piece whitePawn3;
+    piece whitePawn4;
+    piece whitePawn5;
+    piece whitePawn6;
+    piece whitePawn7;
+    piece whitePawn8;
+
+    piece whiteRook1; //Elephant
+    piece whiteKnight1; //Horse
+    piece whiteBishop1; //Camel
+    piece whiteQueen;
+    piece whiteKing;
+    piece whiteBishop2;
+    piece whiteKnight2;
+    piece whiteRook2;
+
+    void updatePos(piece &p, char file, int rank)
+    {
+        p.file = file;
+        p.rank = rank;
+
+        p.yPos = 0.0f;
+        p.xPos = ranks[rank];
+        p.zPos = files[file];
+
+        p.pos = glm::vec3(p.xPos, p.yPos, p.zPos);
+
+        //std::cout << "Piece at r " << ranks[rank] << " file " << file <<" "<< files[file] << "\n";
+    }
+
+}allPieces;
+
+void initialiseBoard(GLuint programID)
+{
+    //set values for ranks and files
+    for (int i = 0; i < 9; i++)
+    {
+        ranks[i] = -1*( -halfChessBoardSize + boxSize / 2 + (i - 1) * boxSize);
+        files[i + 96] = -1*( -halfChessBoardSize + boxSize / 2 + (i - 1) * boxSize);
+
+        //std::cout << ranks[i] << " f " << files[i + 94] << "\n";
+    }
+
+
+    //set pieces
+    allPieces.updatePos(allPieces.blackPawn1, 'a', 7);
+    allPieces.updatePos(allPieces.blackPawn2, 'b', 7);
+    allPieces.updatePos(allPieces.blackPawn3, 'c', 7);
+    allPieces.updatePos(allPieces.blackPawn4, 'd', 7);
+    allPieces.updatePos(allPieces.blackPawn5, 'e', 7);
+    allPieces.updatePos(allPieces.blackPawn6, 'f', 7);
+    allPieces.updatePos(allPieces.blackPawn7, 'g', 7);
+    allPieces.updatePos(allPieces.blackPawn8, 'h', 7);
+
+    allPieces.updatePos(allPieces.blackRook1,   'a', 8);
+    allPieces.updatePos(allPieces.blackKnight1, 'b', 8);
+    allPieces.updatePos(allPieces.blackBishop1, 'c', 8);
+    allPieces.updatePos(allPieces.blackQueen,   'd', 8);
+    allPieces.updatePos(allPieces.blackKing,    'e', 8);
+    allPieces.updatePos(allPieces.blackBishop2, 'f', 8);
+    allPieces.updatePos(allPieces.blackKnight2, 'g', 8);
+    allPieces.updatePos(allPieces.blackRook2,   'h', 8);
+
+    allPieces.blackPawn1.isWhite = false;
+    allPieces.blackPawn2.isWhite = false;
+    allPieces.blackPawn3.isWhite = false;
+    allPieces.blackPawn4.isWhite = false;
+    allPieces.blackPawn5.isWhite = false;
+    allPieces.blackPawn6.isWhite = false;
+    allPieces.blackPawn7.isWhite = false;
+    allPieces.blackPawn8.isWhite = false;
+    allPieces.blackRook1.isWhite = false;
+    allPieces.blackKnight1.isWhite = false;
+    allPieces.blackBishop1.isWhite = false;
+    allPieces.blackKing.isWhite = false;
+    allPieces.blackQueen.isWhite = false;
+    allPieces.blackBishop2.isWhite = false;
+    allPieces.blackKnight2.isWhite = false;
+    allPieces.blackRook2.isWhite = false;
+
+
+    //Whites
+    allPieces.updatePos(allPieces.whitePawn1, 'a', 2);
+    allPieces.updatePos(allPieces.whitePawn2, 'b', 2);
+    allPieces.updatePos(allPieces.whitePawn3, 'c', 2);
+    allPieces.updatePos(allPieces.whitePawn4, 'd', 2);
+    allPieces.updatePos(allPieces.whitePawn5, 'e', 2);
+    allPieces.updatePos(allPieces.whitePawn6, 'f', 2);
+    allPieces.updatePos(allPieces.whitePawn7, 'g', 2);
+    allPieces.updatePos(allPieces.whitePawn8, 'h', 2);
+
+    allPieces.updatePos(allPieces.whiteRook1,   'a', 1);
+    allPieces.updatePos(allPieces.whiteKnight1, 'b', 1);
+    allPieces.updatePos(allPieces.whiteBishop1, 'c', 1);
+    allPieces.updatePos(allPieces.whiteQueen,   'd', 1);
+    allPieces.updatePos(allPieces.whiteKing,    'e', 1);
+    allPieces.updatePos(allPieces.whiteBishop2, 'f', 1);
+    allPieces.updatePos(allPieces.whiteKnight2, 'g', 1);
+    allPieces.updatePos(allPieces.whiteRook2,   'h', 1);
+}
+
+
 //Render the pieces
-void renderPieces(std::vector<glm::vec3> piecePosition, GLuint ModelMatrixID, GLuint MatrixID, GLuint ColorID, CAssimpModel pieceModel, bool isWhite)
+void renderPieces(glm::vec3 piecePosition, GLuint ModelMatrixID, GLuint MatrixID, GLuint ColorID, CAssimpModel pieceModel, bool isWhite)
 {
     // Compute the camera position in Cartesian coordinates
     glm::vec3 positionCamera = glm::vec3(camera.x, camera.y, camera.z);
@@ -122,12 +277,12 @@ void renderPieces(std::vector<glm::vec3> piecePosition, GLuint ModelMatrixID, GL
         100.0f
     );
 
-    for (const auto& position : piecePosition) 
-    {
+   /* for (const auto& position : piecePosition)
+    {*/
         glm::mat4 pieceModelMatrix = glm::mat4(1.0f);
 
         // Apply scaling
-        float pieceScale = 0.3f; 
+        float pieceScale = 0.3f;
         pieceModelMatrix = glm::scale(pieceModelMatrix, glm::vec3(pieceScale));
 
         // Rotate the piece if necessary
@@ -135,7 +290,8 @@ void renderPieces(std::vector<glm::vec3> piecePosition, GLuint ModelMatrixID, GL
             glm::vec3(1.0f, 0.0f, 0.0f));
 
         // Translate the piece to its position
-        pieceModelMatrix = glm::translate(pieceModelMatrix, position);
+        pieceModelMatrix = glm::translate(pieceModelMatrix, piecePosition);
+        //pieceModelMatrix = glm::translate(pieceModelMatrix, position);
 
         // Compute MVP matrix
         glm::mat4 pieceMVP = ProjectionMatrix * ViewMatrix * pieceModelMatrix;
@@ -145,84 +301,124 @@ void renderPieces(std::vector<glm::vec3> piecePosition, GLuint ModelMatrixID, GL
         glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &pieceMVP[0][0]);
 
         if (isWhite) {
-            glUniform4f(ColorID, 5.f, 5.f, 5.f, 1.0f);
+            glUniform4f(ColorID, 4.5f, 4.5f, 4.5f, 4.5f);
         }
         else {
-            glUniform4f(ColorID, 1.0f, 1.0f, 1.0f, 1.0f);
+            glUniform4f(ColorID, 1.5f, 1.5f, 1.5f, 1.5f);
         }
 
         // Render the piece
         pieceModel.RenderModel();
-    }
+    //}
 }
 
+void renderAll(GLuint ModelMatrixID, GLuint MatrixID, GLuint ColorID)
+{
+    //Black
+    renderPieces(allPieces.blackPawn1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
+    renderPieces(allPieces.blackPawn2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
+    renderPieces(allPieces.blackPawn3.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
+    renderPieces(allPieces.blackPawn4.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
+    renderPieces(allPieces.blackPawn5.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
+    renderPieces(allPieces.blackPawn6.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
+    renderPieces(allPieces.blackPawn7.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
+    renderPieces(allPieces.blackPawn8.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
+    renderPieces(allPieces.blackRook1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.rookModel, false);
+    renderPieces(allPieces.blackKnight1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.knightModel, false);
+    renderPieces(allPieces.blackBishop1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.bishopModel, false);
+    renderPieces(allPieces.blackQueen.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.queenModel, false);
+    renderPieces(allPieces.blackKing.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.kingModel, false);
+    renderPieces(allPieces.blackBishop2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.bishopModel, false);
+    renderPieces(allPieces.blackKnight2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.knightModel, false);
+    renderPieces(allPieces.blackRook2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.rookModel, false);
+
+    //White
+    renderPieces(allPieces.whitePawn1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
+    renderPieces(allPieces.whitePawn2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
+    renderPieces(allPieces.whitePawn3.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
+    renderPieces(allPieces.whitePawn4.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
+    renderPieces(allPieces.whitePawn5.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
+    renderPieces(allPieces.whitePawn6.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
+    renderPieces(allPieces.whitePawn7.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
+    renderPieces(allPieces.whitePawn8.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
+    renderPieces(allPieces.whiteRook1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.rookModel, false);
+    renderPieces(allPieces.whiteKnight1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.knightModel, false);
+    renderPieces(allPieces.whiteBishop1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.bishopModel, false);
+    renderPieces(allPieces.whiteQueen.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.queenModel, false);
+    renderPieces(allPieces.whiteKing.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.kingModel, false);
+    renderPieces(allPieces.whiteBishop2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.bishopModel, false);
+    renderPieces(allPieces.whiteKnight2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.knightModel, false);
+    renderPieces(allPieces.whiteRook2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.rookModel, false);
+}
+
+
 // Function to handle camera inputs
-/*void keyBinds() {
+void keyBinds() {
     // Camera speed
     float cameraSpeed = 0.05f;
     float rotationSpeed = 0.002f;
 
     // 'W' Move close
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) 
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
     {
-        cameraRadius -= cameraSpeed;
+        camera.radius -= cameraSpeed;
     }
 
     // 'S' Move farther
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) 
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
     {
-        cameraRadius += cameraSpeed;
+        camera.radius += cameraSpeed;
     }
 
     // 'A' Rotate left
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) 
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
     {
-        horizontalAngle += rotationSpeed;
+        camera.horizontalAngle += rotationSpeed;
     }
 
     // 'D' Rotate right
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) 
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
     {
-        horizontalAngle -= rotationSpeed;
+        camera.horizontalAngle -= rotationSpeed;
     }
 
     // Up Rotate up
-    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) 
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
     {
-        verticalAngle += rotationSpeed;
-        if (verticalAngle > glm::radians(89.0f)) verticalAngle = glm::radians(89.0f);
+        camera.verticalAngle += rotationSpeed;
+        if (camera.verticalAngle > glm::radians(89.0f)) camera.verticalAngle = glm::radians(89.0f);
     }
 
     // Down Rotate down
-    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) 
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
     {
-        verticalAngle -= rotationSpeed;
-        if (verticalAngle < glm::radians(-89.0f)) verticalAngle = glm::radians(-89.0f);
+        camera.verticalAngle -= rotationSpeed;
+        if (camera.verticalAngle < glm::radians(-89.0f)) camera.verticalAngle = glm::radians(-89.0f);
     }
 
     // 'L' key: Toggle specular and diffuse lighting
     static bool lKeyPressedLastFrame = false;
-    if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS) 
+    if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
     {
-        if (!lKeyPressedLastFrame) 
+        if (!lKeyPressedLastFrame)
         {
             specularDiffuseEnabled = !specularDiffuseEnabled;
         }
         lKeyPressedLastFrame = true;
     }
-    else 
+    else
     {
         lKeyPressedLastFrame = false;
     }
 
     // Escape key: Close the window
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) 
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     {
         glfwSetWindowShouldClose(window, true);
     }
 }
-*/
- 
+
+
 
 //EDIT HERE
 void parse(string in, GLuint programID)
@@ -232,18 +428,39 @@ void parse(string in, GLuint programID)
         std::cout << "Thanks for playing!!";
         glfwSetWindowShouldClose(window, true);
     }
-    else if (in.substr(0, 6) == "camera") 
+    if (in == "Play")
+    {
+        if (start == 1) 
+        {
+            std::cout << "Game already in progress\n";
+            return;
+        }
+        else
+        {
+            start = 1;
+            light.horizontalAngle = glm::radians(25.0);
+            light.verticalAngle = glm::radians(5.0);
+            light.radius = 50.0;
+            light.get_Cartesian();
+            light.power = 3000.0;
+
+            GLuint LightID = glGetUniformLocation(programID, "LightPosition_worldspace");
+            glUniform3f(LightID, light.x, light.y, light.z);
+        }
+        
+    }
+    else if (in.substr(0, 6) == "camera")
     {
         float theta = 0.0f, phi = 0.0f, r = 0.0f;
-        if (sscanf_s(in.c_str(), "camera %f %f %f", &theta, &phi, &r) != 3) 
+        if (sscanf_s(in.c_str(), "camera %f %f %f", &theta, &phi, &r) != 3)
         {
-            std::cerr << "Some issue with input" << in<<std::endl;
+            std::cerr << "Some issue with input" << in << std::endl;
             return;
         }
         // Enforce ranges
-        if (r <= 0.0f) 
+        if (r <= 0.0f)
         {
-            std::cerr << "Radius cant be negative" << std::endl;
+            std::cerr << "Radius must be positive" << std::endl;
             return;
         }
         if (theta < 20.0f || theta > 80.0f)
@@ -273,7 +490,7 @@ void parse(string in, GLuint programID)
         // Enforce ranges
         if (r <= 0.0f)
         {
-            std::cerr << "Radius cant be negative" << std::endl;
+            std::cerr << "Radiusmust be positive" << std::endl;
             return;
         }
         if (theta < 20.0f || theta > 80.0f)
@@ -291,7 +508,7 @@ void parse(string in, GLuint programID)
         light.radius = r;
         light.get_Cartesian();
 
-        GLuint LightID = glGetUniformLocation(programID, "LightPosition_worldspace"); 
+        GLuint LightID = glGetUniformLocation(programID, "LightPosition_worldspace");
         glUniform3f(LightID, light.x, light.y, light.z);
     }
     else if (in.substr(0, 5) == "power")
@@ -304,15 +521,40 @@ void parse(string in, GLuint programID)
         }
         light.power = pow;
     }
+    /*else if (in.substr(0, 4) == "move")
+    {
+        string move, initial, final;
+        if (sscanf_s(in.c_str(), "move %s", &move) != 1)
+        {
+            std::cerr << "Invalid Comamnd -> move " << in << std::endl;
+            return;
+        }
+        initial = in.substr(6, 2);
+        final = in.substr(8, 2);
+        std::cout << "Moving from " << initial << " to " << final << std::endl;
+    }*/
+    else if (in.substr(0, 4) == "move")
+    {
+        std::string move, initial, final;
+        if (in.length() < 10)
+        { // Check if the length is sufficient to avoid out-of-bounds 
+            std::cerr << "Invalid Command -> move " << in << std::endl;
+            return;
+        } // Directly extract the move string from the input 
+        move = in.substr(5); // Extracts "e2e3" // Use substr to separate initial and final positions 
+        initial = move.substr(0, 2);
+        final = move.substr(2, 2);
+        std::cout << "Moving from " << initial << " to " << final << std::endl;
+    }
     else
     {
         std::cout << "Invalid command or move!!\n";
     }
 }
 
-bool loadModel(CAssimpModel& model, char* filePath) 
+bool loadModel(CAssimpModel& model, char* filePath)
 {
-    if (!model.LoadModelFromFile(filePath)) 
+    if (!model.LoadModelFromFile(filePath))
     {
         fprintf(stderr, "Failed to load model from %s\n", filePath);
         getchar();
@@ -367,7 +609,7 @@ int main(void) {
     glEnable(GL_CULL_FACE);
     // Load the chessboard model
     CAssimpModel chessboardModel;
-    if (!chessboardModel.LoadModelFromFile("../ChessGame/Stone_Chess_Board/12951_Stone_Chess_Board_v1_L3.obj")) 
+    if (!chessboardModel.LoadModelFromFile("../ChessGame/Stone_Chess_Board/12951_Stone_Chess_Board_v1_L3.obj"))
     {
         fprintf(stderr, "Failed to load chessboard OBJ file!!\n");
         getchar();
@@ -376,33 +618,29 @@ int main(void) {
     }
 
     //Load pieces model using the function defined
-    CAssimpModel pawnModel;
-    if (!loadModel(pawnModel, "../ChessGame/Chess/pawn.obj")) 
+    //CAssimpModel pawnModel;
+    if (!loadModel(pieceModels.pawnModel, "../ChessGame/Chess/pawn.obj"))
     {
         return -1;
     }
-    CAssimpModel kingModel;
-    if (!loadModel(kingModel, "../ChessGame/Chess/king.obj"))
+    if (!loadModel(pieceModels.kingModel, "../ChessGame/Chess/king.obj"))
     {
         return -1;
     }
-    CAssimpModel queenModel;
-    if (!loadModel(queenModel, "../ChessGame/Chess/queen.obj"))
+    if (!loadModel(pieceModels.queenModel, "../ChessGame/Chess/queen.obj"))
     {
         return -1;
     }
     CAssimpModel rookModel;
-    if (!loadModel(rookModel, "../ChessGame/Chess/rook.obj"))
+    if (!loadModel(pieceModels.rookModel, "../ChessGame/Chess/rook.obj"))
+    {
+        return -1;
+    }CAssimpModel knightModel;
+    if (!loadModel(pieceModels.knightModel, "../ChessGame/Chess/knight.obj"))
     {
         return -1;
     }
-    CAssimpModel knightModel;
-    if (!loadModel(knightModel, "../ChessGame/Chess/knight.obj"))
-    {
-        return -1;
-    }
-    CAssimpModel bishopModel;
-    if (!loadModel(bishopModel, "../ChessGame/Chess/bishop.obj"))
+    if (!loadModel(pieceModels.bishopModel, "../ChessGame/Chess/bishop.obj"))
     {
         return -1;
     }
@@ -428,57 +666,10 @@ int main(void) {
     double lastTime = glfwGetTime();
     int nFrames = 0;
 
-    //Get constant values for setting up positions
-    float boxSize = 18.0f; // Size of each square
-    float ChessBoardSize = boxSize * 8;
-    float halfChessBoardSize = ChessBoardSize / 2.0f;
 
-    //Black pieces
-    std::vector<glm::vec3> blackPawn;
-    std::vector<glm::vec3> blackKing;
-    std::vector<glm::vec3> blackQueen;
-    std::vector<glm::vec3> blackBishop;
-    std::vector<glm::vec3> blackKnight;
-    std::vector<glm::vec3> blackRook;
 
-    //White pieces
-    std::vector<glm::vec3> whitePawn;
-    std::vector<glm::vec3> whiteKing;
-    std::vector<glm::vec3> whiteQueen;
-    std::vector<glm::vec3> whiteBishop;
-    std::vector<glm::vec3> whiteKnight;
-    std::vector<glm::vec3> whiteRook;
-
-    // White pieces positions
-    for (int i = 0; i < 8; ++i) {
-        float x = -halfChessBoardSize + boxSize / 2 + i * boxSize;
-        float z = halfChessBoardSize - 1.5f * boxSize;
-        whitePawn.push_back(glm::vec3(x, 0.0f, z));
-    }
-    whiteRook.push_back(glm::vec3(-halfChessBoardSize + boxSize / 2 + 0 * boxSize, 0.0f, halfChessBoardSize - 0.5f * boxSize));
-    whiteKnight.push_back(glm::vec3(-halfChessBoardSize + boxSize / 2 + 1 * boxSize, 0.0f, halfChessBoardSize - 0.5f * boxSize));
-    whiteBishop.push_back(glm::vec3(-halfChessBoardSize + boxSize / 2 + 2 * boxSize, 0.0f, halfChessBoardSize - 0.5f * boxSize));
-    whiteQueen.push_back(glm::vec3(-halfChessBoardSize + boxSize / 2 + 3 * boxSize, 0.0f, halfChessBoardSize - 0.5f * boxSize));
-    whiteKing.push_back(glm::vec3(-halfChessBoardSize + boxSize / 2 + 4 * boxSize, 0.0f, halfChessBoardSize - 0.5f * boxSize));
-    whiteBishop.push_back(glm::vec3(-halfChessBoardSize + boxSize / 2 + 5 * boxSize, 0.0f, halfChessBoardSize - 0.5f * boxSize));
-    whiteKnight.push_back(glm::vec3(-halfChessBoardSize + boxSize / 2 + 6 * boxSize, 0.0f, halfChessBoardSize - 0.5f * boxSize));
-    whiteRook.push_back(glm::vec3(-halfChessBoardSize + boxSize / 2 + 7 * boxSize, 0.0f, halfChessBoardSize - 0.5f * boxSize));
-    
-
-    // Black pieces positions
-    for (int i = 0; i < 8; ++i) {
-        float x = -halfChessBoardSize + boxSize / 2 + i * boxSize;
-        float z = -halfChessBoardSize + 1.5f * boxSize;
-        blackPawn.push_back(glm::vec3(x, 0.0f, z));
-    }
-    blackRook.push_back(glm::vec3(-halfChessBoardSize + boxSize / 2 + 0 * boxSize, 0.0f, -halfChessBoardSize + 0.5f * boxSize));
-    blackKnight.push_back(glm::vec3(-halfChessBoardSize + boxSize / 2 + 1 * boxSize, 0.0f, -halfChessBoardSize + 0.5f * boxSize));
-    blackBishop.push_back(glm::vec3(-halfChessBoardSize + boxSize / 2 + 2 * boxSize, 0.0f, -halfChessBoardSize + 0.5f * boxSize));
-    blackQueen.push_back(glm::vec3(-halfChessBoardSize + boxSize / 2 + 3 * boxSize, 0.0f, -halfChessBoardSize + 0.5f * boxSize));
-    blackKing.push_back(glm::vec3(-halfChessBoardSize + boxSize / 2 + 4 * boxSize, 0.0f, -halfChessBoardSize + 0.5f * boxSize));
-    blackBishop.push_back(glm::vec3(-halfChessBoardSize + boxSize / 2 + 5 * boxSize, 0.0f, -halfChessBoardSize + 0.5f * boxSize));
-    blackKnight.push_back(glm::vec3(-halfChessBoardSize + boxSize / 2 + 6 * boxSize, 0.0f, -halfChessBoardSize + 0.5f * boxSize));
-    blackRook.push_back(glm::vec3(-halfChessBoardSize + boxSize / 2 + 7 * boxSize, 0.0f, -halfChessBoardSize + 0.5f * boxSize));
+    //initialise the board
+    initialiseBoard(programID);
 
     string in;
 
@@ -486,8 +677,9 @@ int main(void) {
     glUniform3f(LightID, light.x, light.y, light.z);
 
     // Main rendering loop
-    do 
+    do
     {
+                
         // Get render time
         double currentTime = glfwGetTime();
         nFrames++;
@@ -500,19 +692,16 @@ int main(void) {
         // Clear the screen
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // Handle camera inputs
-        //keyBinds();
-
         // Use our shader
         glUseProgram(programID);
-        
+
         // Compute the camera position in Cartesian coordinates
         glm::vec3 positionCamera;
         camera.get_Cartesian();
         positionCamera.x = camera.x;
         positionCamera.y = camera.y;
         positionCamera.z = camera.z;
-        
+
         // Camera looks at the origin
         glm::vec3 targetCamera = glm::vec3(0.0f, 0.0f, 0.0f);
 
@@ -533,14 +722,14 @@ int main(void) {
             0.1f,
             100.0f
         );
-        
-// Set common uniforms
+
+        // Set common uniforms
         glUniformMatrix4fv(ViewMatrixID, 1, GL_FALSE, &ViewMatrix[0][0]);
-        glUniform1i(SpecularDiffuseEnabledID, light.specularDiffuseEnabled ? 1 : 0);
+        glUniform1i(SpecularDiffuseEnabledID, specularDiffuseEnabled ? 1 : 0);
         glUniform1f(lightPower, light.power);
 
 
-// Chessboard rendering
+        // Chessboard rendering
         {
             glm::mat4 chessboardModelMatrix = glm::mat4(1.0f);
 
@@ -551,7 +740,8 @@ int main(void) {
             // Rotate the chessboard if necessary
             chessboardModelMatrix = glm::rotate(chessboardModelMatrix, glm::radians(-90.0f),
                 glm::vec3(1.0, 0.0, 0.0));
-
+            chessboardModelMatrix = glm::rotate(chessboardModelMatrix, glm::radians(90.0f),
+                glm::vec3(0.0, 0.0, 1.0));
             glm::mat4 chessboardMVP = ProjectionMatrix * ViewMatrix * chessboardModelMatrix;
 
             // Send uniforms to the shader
@@ -562,30 +752,25 @@ int main(void) {
             chessboardModel.RenderModel();
         }
 
-//Render all the pieces by calling reference function
-        renderPieces(whitePawn, ModelMatrixID, MatrixID, ColorID, pawnModel, true);
-        renderPieces(whiteKing, ModelMatrixID, MatrixID, ColorID, kingModel, true);
-        renderPieces(whiteQueen, ModelMatrixID, MatrixID, ColorID, queenModel, true);
-        renderPieces(whiteBishop, ModelMatrixID, MatrixID, ColorID, bishopModel, true);
-        renderPieces(whiteKnight, ModelMatrixID, MatrixID, ColorID, knightModel, true);
-        renderPieces(whiteRook, ModelMatrixID, MatrixID, ColorID, rookModel, true);
-        
-        renderPieces(blackPawn, ModelMatrixID, MatrixID, ColorID, pawnModel, false);
-        renderPieces(blackKing, ModelMatrixID, MatrixID, ColorID, kingModel, false);
-        renderPieces(blackQueen, ModelMatrixID, MatrixID, ColorID, queenModel, false);
-        renderPieces(blackBishop, ModelMatrixID, MatrixID, ColorID, bishopModel, false);
-        renderPieces(blackKnight, ModelMatrixID, MatrixID, ColorID, knightModel, false);
-        renderPieces(blackRook, ModelMatrixID, MatrixID, ColorID, rookModel, false);
+        //Render all the pieces by calling reference function
+        renderAll(ModelMatrixID, MatrixID, ColorID);
+
 
         // Swap buffers
         glfwSwapBuffers(window);
         glfwPollEvents();
 
-        cout << "Please enter a command: ";
+        if (start == 0)
+            cout << "Type Play to start: ";
+        else
+            cout << "Please enter a command: ";
         std::getline(std::cin, in);
 
         //Parse the string input
         parse(in, programID);
+
+        //// Handle camera inputs
+        //keyBinds();
 
     } while (!glfwWindowShouldClose(window));
 
