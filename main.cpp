@@ -23,7 +23,7 @@ using namespace glm;
 #include "Windows.h"
 #include <regex>
 
-/*
+
 #include <map>
 #include <string>
 #include <iostream>
@@ -36,9 +36,255 @@ using namespace glm;
 #include <condition_variable>
 #include <memory>
 #include <cmath>
-*/
 
 using namespace std;
+
+class ECE_ChessEngine {
+public:
+    ECE_ChessEngine(const std::string& path) : enginePath(path), engineReady(false) {}
+    ~ECE_ChessEngine() {
+        engineReady = false;
+        if (engineThread.joinable()) {
+            engineThread.join();
+        }
+        CloseHandle(childStd_IN_Wr);
+        CloseHandle(childStd_OUT_Rd);
+        CloseHandle(piProcInfo.hProcess);
+        CloseHandle(piProcInfo.hThread);
+    }
+
+    bool initializeEngine() {
+        std::cout << "Initializing engine..." << std::endl;
+
+        SECURITY_ATTRIBUTES saAttr;
+        saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+        saAttr.bInheritHandle = TRUE; // Allow inheritance
+        saAttr.lpSecurityDescriptor = NULL;
+
+        // Create a pipe for the child process's STDOUT.
+        if (!CreatePipe(&childStd_OUT_Rd, &childStd_OUT_Wr, &saAttr, 0)) {
+            std::cerr << "StdoutRd CreatePipe failed\n";
+            return false;
+        }
+
+        // Ensure the read handle to the pipe for STDOUT is not inherited.
+        if (!SetHandleInformation(childStd_OUT_Rd, HANDLE_FLAG_INHERIT, 0)) {
+            std::cerr << "Stdout SetHandleInformation failed\n";
+            return false;
+        }
+
+        // Create a pipe for the child process's STDIN.
+        if (!CreatePipe(&childStd_IN_Rd, &childStd_IN_Wr, &saAttr, 0)) {
+            std::cerr << "Stdin CreatePipe failed\n";
+            return false;
+        }
+
+        // Ensure the write handle to the pipe for STDIN is not inherited.
+        if (!SetHandleInformation(childStd_IN_Wr, HANDLE_FLAG_INHERIT, 0)) {
+            std::cerr << "Stdin SetHandleInformation failed\n";
+            return false;
+        }
+
+        // Create the child process.
+        if (!createChildProcess()) {
+            std::cerr << "Failed to create child process\n";
+            return false;
+        }
+        std::cout << "Child process created successfully." << std::endl;
+
+        engineReady = true;
+        engineThread = std::thread(&ECE_ChessEngine::readEngineOutput, this);
+
+        sendCommand("uci\n");  // Initialize UCI mode
+        std::cout << "Sent 'uci' command to the engine." << std::endl;
+
+        // Wait for "uciok"
+        {
+            std::unique_lock<std::mutex> lock(engineMutex);
+            if (!engineCondition.wait_for(lock, std::chrono::seconds(5),
+                [this]() { return uciOkReceived; })) {
+                std::cerr << "Timeout waiting for 'uciok' from engine." << std::endl;
+                return false;
+            }
+        }
+        std::cout << "Received 'uciok' from the engine." << std::endl;
+
+        sendCommand("isready\n");  // Wait for the engine to be ready
+        std::cout << "Sent 'isready' command to the engine." << std::endl;
+
+        // Wait for "readyok"
+        {
+            std::unique_lock<std::mutex> lock(engineMutex);
+            if (!engineCondition.wait_for(lock, std::chrono::seconds(5),
+                [this]() { return readyOkReceived; })) {
+                std::cerr << "Timeout waiting for 'readyok' from engine." << std::endl;
+                return false;
+            }
+        }
+        std::cout << "Received 'readyok' from the engine." << std::endl;
+
+        return true;
+    }
+
+    bool sendMove(const std::string& moveHistory) {
+        if (!engineReady) return false;
+        std::string command = "position startpos moves" + moveHistory + "\n";
+        return sendCommand(command) && sendCommand("go\n");
+    }
+
+    bool getResponseMove(std::string& responseMove) {
+        std::unique_lock<std::mutex> lock(engineMutex);
+        if (engineCondition.wait_for(lock, std::chrono::seconds(10),
+            [this]() { return !engineResponses.empty(); })) {
+            responseMove = engineResponses.front();
+            engineResponses.erase(engineResponses.begin());
+            return true;
+        }
+        return false;
+    }
+
+    // Function to send a generic command to the engine
+    bool sendCommand(const std::string& command) {
+        if (!engineReady) return false;
+        return writeToEngine(command);
+    }
+
+private:
+    std::string enginePath;
+    PROCESS_INFORMATION piProcInfo;
+    HANDLE childStd_IN_Rd = NULL;
+    HANDLE childStd_IN_Wr = NULL;
+    HANDLE childStd_OUT_Rd = NULL;
+    HANDLE childStd_OUT_Wr = NULL;
+    std::atomic<bool> engineReady;
+    std::thread engineThread;
+    std::mutex engineMutex;
+    std::condition_variable engineCondition;
+    std::vector<std::string> engineResponses;
+    bool uciOkReceived = false;
+    bool readyOkReceived = false;
+
+    bool createChildProcess() {
+        // Set up members of the PROCESS_INFORMATION structure.
+        ZeroMemory(&piProcInfo, sizeof(PROCESS_INFORMATION));
+
+        // Set up members of the STARTUPINFO structure.
+        STARTUPINFOA siStartInfo;
+        ZeroMemory(&siStartInfo, sizeof(STARTUPINFOA));
+        siStartInfo.cb = sizeof(STARTUPINFOA);
+        siStartInfo.hStdError = childStd_OUT_Wr;
+        siStartInfo.hStdOutput = childStd_OUT_Wr;
+        siStartInfo.hStdInput = childStd_IN_Rd;
+        siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
+
+        // Prepare mutable command line
+        std::string cmdLine = enginePath;
+        char* cmdLineMutable = &cmdLine[0]; // Get mutable C-string
+
+        // Create the child process.
+        BOOL success = CreateProcessA(
+            NULL,               // Application name
+            cmdLineMutable,     // Command line (mutable)
+            NULL,               // Process security attributes
+            NULL,               // Primary thread security attributes
+            TRUE,               // Handles are inherited
+            CREATE_NO_WINDOW,   // Creation flags (no console window)
+            NULL,               // Use parent's environment
+            NULL,               // Use parent's current directory
+            &siStartInfo,       // STARTUPINFO pointer
+            &piProcInfo         // Receives PROCESS_INFORMATION
+        );
+
+        if (!success) {
+            DWORD errorCode = GetLastError();
+            LPVOID errorMsg;
+            FormatMessageA(
+                FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+                FORMAT_MESSAGE_IGNORE_INSERTS,
+                NULL,
+                errorCode,
+                MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                (LPSTR)&errorMsg,
+                0,
+                NULL
+            );
+            std::cerr << "CreateProcess failed with error (" << errorCode
+                << "): " << (char*)errorMsg << std::endl;
+            LocalFree(errorMsg);
+            return false;
+        }
+        // Close handles to the child's STDIN and STDOUT pipes no longer needed by the parent.
+        CloseHandle(childStd_OUT_Wr);
+        CloseHandle(childStd_IN_Rd);
+        return true;
+    }
+
+    void readEngineOutput() {
+        DWORD bytesRead;
+        CHAR buffer[4096];
+        std::string leftover;
+        while (engineReady) {
+            BOOL success = ReadFile(childStd_OUT_Rd, buffer, sizeof(buffer) - 1,
+                &bytesRead, NULL);
+            if (!success || bytesRead == 0) {
+                break;
+            }
+            buffer[bytesRead] = '\0';
+            std::string output(buffer);
+
+            output = leftover + output;
+
+            // Process the output line by line
+            size_t pos = 0;
+            size_t newlinePos;
+            while ((newlinePos = output.find_first_of("\r\n", pos)) != std::string::npos) {
+                std::string line = output.substr(pos, newlinePos - pos);
+                processEngineOutputLine(line);
+                // Skip over consecutive \r\n characters
+                pos = output.find_first_not_of("\r\n", newlinePos);
+                if (pos == std::string::npos) {
+                    pos = output.size();
+                }
+            }
+
+            // Save any leftover output for next time
+            leftover = output.substr(pos);
+        }
+    }
+
+    void processEngineOutputLine(const std::string& line) {
+        if (line.empty()) return; // Ignore empty lines
+        std::cout << "Engine Output: " << line << std::endl; // Debug output
+        std::lock_guard<std::mutex> lock(engineMutex);
+        if (line == "uciok") {
+            uciOkReceived = true;
+            engineCondition.notify_all();
+        }
+        else if (line == "readyok") {
+            readyOkReceived = true;
+            engineCondition.notify_all();
+        }
+        else if (line.find("bestmove") == 0) {
+            if (line.find("bestmove (none)") != std::string::npos) {
+                // The engine has no move; checkmate or stalemate
+                engineResponses.push_back("none");
+                engineCondition.notify_all();
+            }
+            else {
+                std::string bestMove = line.substr(9, 4);
+                engineResponses.push_back(bestMove);
+                engineCondition.notify_all();
+            }
+        }
+    }
+
+    bool writeToEngine(const std::string& command) {
+        DWORD bytesWritten;
+        BOOL success = WriteFile(childStd_IN_Wr, command.c_str(), command.size(),
+            &bytesWritten, NULL);
+        return success && bytesWritten == command.size();
+    }
+};
 
 //Some global functions and variables
 //Get constant values for setting up positions
@@ -47,14 +293,19 @@ float ChessBoardSize = boxSize * 8;
 float halfChessBoardSize = ChessBoardSize / 2.0f;
 int start = 0;
 bool specularDiffuseEnabled = true;
+int killID = 0;
+
+string move_history = "";
 
 //z for now
 //will use only 95 to 104
 float files[105];
+float killFile[32];
 
 //x axis
 //took 0 as spare
 float ranks[9];
+float killRank[32];
 
 // Camera parameters
 struct camera
@@ -192,8 +443,48 @@ void initialiseBoard(GLuint programID)
         ranks[i] = -1*( -halfChessBoardSize + boxSize / 2 + (i - 1) * boxSize);
         files[i + 96] = -1*( -halfChessBoardSize + boxSize / 2 + (i - 1) * boxSize);
 
-        //std::cout << ranks[i] << " f " << files[i + 94] << "\n";
+        std::cout << "Rank " << i << " " << ranks[i] << " files  " << files[i + 96] << "\n";
     }
+    for (int i = 0; i < 32; i++)
+    {
+        killRank[i] = 1000;
+        killFile[i] = 1000;
+    }
+//HERE
+    //for (int i = 0; i < 8; i++)
+    //{
+    //    for (int j=0; j<4; j++)
+    //    {
+    //        killFile[4 * i + j] = ;
+    //        //killFile[4 * i + j] = (-1 * (-halfChessBoardSize + boxSize / 2 + (j - 1) * boxSize));
+    //        switch (j) 
+    //        {
+    //            case 0:
+    //            {
+    //                killRank[4 * i + j] = 90;
+    //                break;
+    //            }
+    //            case 1:
+    //            {
+    //                killRank[4 * i + j] = -75;
+    //                break;
+    //            }
+    //            case 2:
+    //            {
+    //                killRank[4 * i + j] = 100;
+    //                break;
+    //            }
+    //            case 3:
+    //            {
+    //                killRank[4 * i + j] = -85;
+    //                break;
+    //            }
+    //            default:
+    //                break;
+    //        }
+    //        std::cout << "Kill rank " << 4 * i + j << " " << killRank[4 * i + j] << " file  " << killFile[4 * i + j] << "\n";
+    //    }
+    //}
 
 
     //set pieces
@@ -435,22 +726,40 @@ piece* findPiece(allPiece& pieces, char file, int rank)
     return nullptr;
 }
 
-void toMove(string initial, string final)
+//Do Komodo's move as well 
+bool toMove(string initial, string final)
 {
     //Find piece
     int found = 0;
-    piece* foundPiece = findPiece(allPieces, initial[0], int(initial[1] - '0'));
-    std::cout << "Check at palce "<<initial[0]<<" "<<int(initial[1] - '0')<<std::endl;
-    if (foundPiece == nullptr)
+    piece* foundPiece_toMove = findPiece(allPieces, initial[0], int(initial[1] - '0'));
+    piece* foundPiece_toKill = findPiece(allPieces, final[0], int(final[1] - '0'));
+    //std::cout << "Check at palce "<<initial[0]<<" "<<int(initial[1] - '0')<<std::endl;
+    if (foundPiece_toMove == nullptr)
     {
         std::cout << "No piece at given place\n";
-        return;
+        return false;
     }
     else
     {
-        allPieces.updatePos(*foundPiece, final[0], int(final[1] - '0'));
+        if (foundPiece_toKill)
+        {
+            if (foundPiece_toKill->isWhite == foundPiece_toMove->isWhite)
+            {
+                std::cout << "Cant destroy piece of same color\n";
+                return false;
+            }
+            
+            allPieces.updatePos(*foundPiece_toKill, killRank[killID], killFile[killID]);
+            std::cout << "Piece destroyed\n";
+            killID++;
+        }
+        allPieces.updatePos(*foundPiece_toMove, final[0], int(final[1] - '0'));
         std::cout << "Move done\n";
-        return;
+
+        //Add move to history
+        move_history += " " + initial + final;
+
+        return true;
     }
 
     //Check if valid move for this
@@ -458,10 +767,34 @@ void toMove(string initial, string final)
     //Move
 
     //check if destroy or checkmate
+    
+
+
+}
+
+void useKomodo(ECE_ChessEngine& chessEngine)
+{
+    if (chessEngine.sendMove(move_history))
+    {
+        std::string responseMove;
+        if (chessEngine.getResponseMove(responseMove))
+        {
+            if (responseMove == "none")
+            {
+                std::cout << "Checkmate you win!!" << std::endl;
+                return;
+            }
+            std::cout << "Engine move: " << responseMove << std::endl;
+
+            // Add the engine's move to moveHistory
+            toMove(responseMove.substr(0, 2), responseMove.substr(2, 2));
+            //move_history += " " + responseMove;
+        }
+    }
 }
 
 //EDIT HERE
-void parse(string in, GLuint programID)
+void parse(string in, GLuint programID, ECE_ChessEngine& chessEngine)
 {
     if (in == "quit")
     {
@@ -578,7 +911,18 @@ void parse(string in, GLuint programID)
         initial = move.substr(0, 2);
         final = move.substr(2, 2);
         //std::cout << "Moving from " << initial << " to " << final << std::endl;
-        toMove(initial, final);
+        if (initial == final)
+        {
+            std::cerr << "Initial and final position can't be same " << in << std::endl;
+            return;
+        }
+        bool move_done = false;
+        move_done = toMove(initial, final);
+        if (move_done)
+        {
+            cout << "Calling Komodo\n";
+            useKomodo(chessEngine);
+        }
     }
     else
     {
@@ -705,6 +1049,21 @@ int main(void) {
     //initialise the board
     initialiseBoard(programID);
 
+    //initialise engine
+    std::string enginePath = "komodo-14.1-64bit.exe"; // Replace with the correct path
+    // to your engine
+    ECE_ChessEngine chessEngine(enginePath);
+
+    // Output the engine path for verification
+    std::cout << "Engine Path: " << enginePath << std::endl;
+
+    if (!chessEngine.initializeEngine())
+    {
+        std::cerr << "Failed to initialize the chess engine." << std::endl;
+        glfwTerminate();
+        return 0;
+    }
+
     string in;
 
     // Set the light position
@@ -801,7 +1160,7 @@ int main(void) {
         std::getline(std::cin, in);
 
         //Parse the string input
-        parse(in, programID);
+        parse(in, programID, chessEngine);
 
         //// Handle camera inputs
         //keyBinds();
