@@ -21,6 +21,7 @@ GLFWwindow* window;
 using namespace glm;
 #include "assimp_model.h"
 #include "Windows.h"
+#include <regex>
 
 /*
 #include <map>
@@ -127,7 +128,7 @@ struct models
 } pieceModels;
 
 //Struct for all chess pieces
-struct allPieces
+struct allPiece
 {
     //Black pieces
     piece blackPawn1;
@@ -351,7 +352,6 @@ void renderAll(GLuint ModelMatrixID, GLuint MatrixID, GLuint ColorID)
     renderPieces(allPieces.whiteRook2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.rookModel, false);
 }
 
-
 // Function to handle camera inputs
 void keyBinds() {
     // Camera speed
@@ -418,7 +418,47 @@ void keyBinds() {
     }
 }
 
+piece* findPiece(allPiece& pieces, char file, int rank)
+{
+    piece* pieceArray[] = {
+        &pieces.blackPawn1, &pieces.blackPawn2, &pieces.blackPawn3, &pieces.blackPawn4, &pieces.blackPawn5, &pieces.blackPawn6, &pieces.blackPawn7, &pieces.blackPawn8,
+        &pieces.blackRook1, &pieces.blackKnight1, &pieces.blackBishop1, &pieces.blackQueen, &pieces.blackKing, &pieces.blackBishop2, &pieces.blackKnight2, &pieces.blackRook2,
+        &pieces.whitePawn1, &pieces.whitePawn2, &pieces.whitePawn3, &pieces.whitePawn4, &pieces.whitePawn5, &pieces.whitePawn6, &pieces.whitePawn7, &pieces.whitePawn8,
+        &pieces.whiteRook1, &pieces.whiteKnight1, &pieces.whiteBishop1, &pieces.whiteQueen, &pieces.whiteKing, &pieces.whiteBishop2, &pieces.whiteKnight2, &pieces.whiteRook2
+    };
 
+    for (auto& p : pieceArray) {
+        if (p->file == file && p->rank == rank) {
+            return p;
+        }
+    }
+    return nullptr;
+}
+
+void toMove(string initial, string final)
+{
+    //Find piece
+    int found = 0;
+    piece* foundPiece = findPiece(allPieces, initial[0], int(initial[1] - '0'));
+    std::cout << "Check at palce "<<initial[0]<<" "<<int(initial[1] - '0')<<std::endl;
+    if (foundPiece == nullptr)
+    {
+        std::cout << "No piece at given place\n";
+        return;
+    }
+    else
+    {
+        allPieces.updatePos(*foundPiece, final[0], int(final[1] - '0'));
+        std::cout << "Move done\n";
+        return;
+    }
+
+    //Check if valid move for this
+
+    //Move
+
+    //check if destroy or checkmate
+}
 
 //EDIT HERE
 void parse(string in, GLuint programID)
@@ -449,6 +489,7 @@ void parse(string in, GLuint programID)
         }
         
     }
+    
     else if (in.substr(0, 6) == "camera")
     {
         float theta = 0.0f, phi = 0.0f, r = 0.0f;
@@ -511,6 +552,7 @@ void parse(string in, GLuint programID)
         GLuint LightID = glGetUniformLocation(programID, "LightPosition_worldspace");
         glUniform3f(LightID, light.x, light.y, light.z);
     }
+    
     else if (in.substr(0, 5) == "power")
     {
         float pow = 0.0f;
@@ -521,30 +563,22 @@ void parse(string in, GLuint programID)
         }
         light.power = pow;
     }
-    /*else if (in.substr(0, 4) == "move")
-    {
-        string move, initial, final;
-        if (sscanf_s(in.c_str(), "move %s", &move) != 1)
-        {
-            std::cerr << "Invalid Comamnd -> move " << in << std::endl;
-            return;
-        }
-        initial = in.substr(6, 2);
-        final = in.substr(8, 2);
-        std::cout << "Moving from " << initial << " to " << final << std::endl;
-    }*/
+
     else if (in.substr(0, 4) == "move")
     {
+        std::regex moveRegex("^move [a-h][1-8][a-h][1-8]$");
         std::string move, initial, final;
-        if (in.length() < 10)
+        if (!std::regex_match(in, moveRegex))
         { // Check if the length is sufficient to avoid out-of-bounds 
             std::cerr << "Invalid Command -> move " << in << std::endl;
             return;
-        } // Directly extract the move string from the input 
+        }    
+        // Directly extract the move string from the input 
         move = in.substr(5); // Extracts "e2e3" // Use substr to separate initial and final positions 
         initial = move.substr(0, 2);
         final = move.substr(2, 2);
-        std::cout << "Moving from " << initial << " to " << final << std::endl;
+        //std::cout << "Moving from " << initial << " to " << final << std::endl;
+        toMove(initial, final);
     }
     else
     {
