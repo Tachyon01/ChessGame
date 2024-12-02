@@ -39,55 +39,20 @@ using namespace glm;
 
 using namespace std;
 
+
 class ECE_ChessEngine {
 public:
-    ECE_ChessEngine(const std::string& path) : enginePath(path), engineReady(false) {}
+    ECE_ChessEngine(const std::string& path)
+        : enginePath(path), engineReady(false) {}
+
     ~ECE_ChessEngine() {
-        engineReady = false;
-        if (engineThread.joinable()) {
-            engineThread.join();
-        }
-        CloseHandle(childStd_IN_Wr);
-        CloseHandle(childStd_OUT_Rd);
-        CloseHandle(piProcInfo.hProcess);
-        CloseHandle(piProcInfo.hThread);
+        cleanupEngine();
     }
 
     bool initializeEngine() {
         std::cout << "Initializing engine..." << std::endl;
 
-        SECURITY_ATTRIBUTES saAttr;
-        saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
-        saAttr.bInheritHandle = TRUE; // Allow inheritance
-        saAttr.lpSecurityDescriptor = NULL;
-
-        // Create a pipe for the child process's STDOUT.
-        if (!CreatePipe(&childStd_OUT_Rd, &childStd_OUT_Wr, &saAttr, 0)) {
-            std::cerr << "StdoutRd CreatePipe failed\n";
-            return false;
-        }
-
-        // Ensure the read handle to the pipe for STDOUT is not inherited.
-        if (!SetHandleInformation(childStd_OUT_Rd, HANDLE_FLAG_INHERIT, 0)) {
-            std::cerr << "Stdout SetHandleInformation failed\n";
-            return false;
-        }
-
-        // Create a pipe for the child process's STDIN.
-        if (!CreatePipe(&childStd_IN_Rd, &childStd_IN_Wr, &saAttr, 0)) {
-            std::cerr << "Stdin CreatePipe failed\n";
-            return false;
-        }
-
-        // Ensure the write handle to the pipe for STDIN is not inherited.
-        if (!SetHandleInformation(childStd_IN_Wr, HANDLE_FLAG_INHERIT, 0)) {
-            std::cerr << "Stdin SetHandleInformation failed\n";
-            return false;
-        }
-
-        // Create the child process.
-        if (!createChildProcess()) {
-            std::cerr << "Failed to create child process\n";
+        if (!setupPipes() || !createChildProcess()) {
             return false;
         }
         std::cout << "Child process created successfully." << std::endl;
@@ -95,40 +60,12 @@ public:
         engineReady = true;
         engineThread = std::thread(&ECE_ChessEngine::readEngineOutput, this);
 
-        sendCommand("uci\n");  // Initialize UCI mode
-        std::cout << "Sent 'uci' command to the engine." << std::endl;
-
-        // Wait for "uciok"
-        {
-            std::unique_lock<std::mutex> lock(engineMutex);
-            if (!engineCondition.wait_for(lock, std::chrono::seconds(5),
-                [this]() { return uciOkReceived; })) {
-                std::cerr << "Timeout waiting for 'uciok' from engine." << std::endl;
-                return false;
-            }
-        }
-        std::cout << "Received 'uciok' from the engine." << std::endl;
-
-        sendCommand("isready\n");  // Wait for the engine to be ready
-        std::cout << "Sent 'isready' command to the engine." << std::endl;
-
-        // Wait for "readyok"
-        {
-            std::unique_lock<std::mutex> lock(engineMutex);
-            if (!engineCondition.wait_for(lock, std::chrono::seconds(5),
-                [this]() { return readyOkReceived; })) {
-                std::cerr << "Timeout waiting for 'readyok' from engine." << std::endl;
-                return false;
-            }
-        }
-        std::cout << "Received 'readyok' from the engine." << std::endl;
-
-        return true;
+        return initializeUCI();
     }
 
     bool sendMove(const std::string& moveHistory) {
         if (!engineReady) return false;
-        std::string command = "position startpos moves" + moveHistory + "\n";
+        std::string command = "position startpos moves " + moveHistory + "\n";
         return sendCommand(command) && sendCommand("go\n");
     }
 
@@ -164,12 +101,38 @@ private:
     bool uciOkReceived = false;
     bool readyOkReceived = false;
 
+    void cleanupEngine() {
+        engineReady = false;
+        if (engineThread.joinable()) {
+            engineThread.join();
+        }
+        CloseHandle(childStd_IN_Wr);
+        CloseHandle(childStd_OUT_Rd);
+        CloseHandle(piProcInfo.hProcess);
+        CloseHandle(piProcInfo.hThread);
+    }
+
+    bool setupPipes() {
+        SECURITY_ATTRIBUTES saAttr = {};
+        saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+        saAttr.bInheritHandle = TRUE;
+        saAttr.lpSecurityDescriptor = NULL;
+
+        if (!CreatePipe(&childStd_OUT_Rd, &childStd_OUT_Wr, &saAttr, 0) ||
+            !SetHandleInformation(childStd_OUT_Rd, HANDLE_FLAG_INHERIT, 0) ||
+            !CreatePipe(&childStd_IN_Rd, &childStd_IN_Wr, &saAttr, 0) ||
+            !SetHandleInformation(childStd_IN_Wr, HANDLE_FLAG_INHERIT, 0)) {
+            std::cerr << "Failed to set up pipes." << std::endl;
+            return false;
+        }
+
+        return true;
+    }
+
     bool createChildProcess() {
-        // Set up members of the PROCESS_INFORMATION structure.
         ZeroMemory(&piProcInfo, sizeof(PROCESS_INFORMATION));
 
-        // Set up members of the STARTUPINFO structure.
-        STARTUPINFOA siStartInfo;
+        STARTUPINFOA siStartInfo = {};
         ZeroMemory(&siStartInfo, sizeof(STARTUPINFOA));
         siStartInfo.cb = sizeof(STARTUPINFOA);
         siStartInfo.hStdError = childStd_OUT_Wr;
@@ -177,45 +140,56 @@ private:
         siStartInfo.hStdInput = childStd_IN_Rd;
         siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
 
-        // Prepare mutable command line
         std::string cmdLine = enginePath;
-        char* cmdLineMutable = &cmdLine[0]; // Get mutable C-string
+        char* cmdLineMutable = &cmdLine[0];
 
-        // Create the child process.
         BOOL success = CreateProcessA(
-            NULL,               // Application name
-            cmdLineMutable,     // Command line (mutable)
-            NULL,               // Process security attributes
-            NULL,               // Primary thread security attributes
-            TRUE,               // Handles are inherited
-            CREATE_NO_WINDOW,   // Creation flags (no console window)
-            NULL,               // Use parent's environment
-            NULL,               // Use parent's current directory
-            &siStartInfo,       // STARTUPINFO pointer
-            &piProcInfo         // Receives PROCESS_INFORMATION
-        );
+            NULL, cmdLineMutable, NULL, NULL, TRUE,
+            CREATE_NO_WINDOW, NULL, NULL, &siStartInfo, &piProcInfo);
 
         if (!success) {
-            DWORD errorCode = GetLastError();
-            LPVOID errorMsg;
-            FormatMessageA(
-                FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-                FORMAT_MESSAGE_IGNORE_INSERTS,
-                NULL,
-                errorCode,
-                MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                (LPSTR)&errorMsg,
-                0,
-                NULL
-            );
-            std::cerr << "CreateProcess failed with error (" << errorCode
-                << "): " << (char*)errorMsg << std::endl;
-            LocalFree(errorMsg);
+            reportError();
             return false;
         }
-        // Close handles to the child's STDIN and STDOUT pipes no longer needed by the parent.
+
         CloseHandle(childStd_OUT_Wr);
         CloseHandle(childStd_IN_Rd);
+        return true;
+    }
+
+    void reportError() {
+        DWORD errorCode = GetLastError();
+        LPVOID errorMsg;
+        FormatMessageA(
+            FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+            FORMAT_MESSAGE_IGNORE_INSERTS,
+            NULL, errorCode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+            (LPSTR)&errorMsg, 0, NULL);
+        std::cerr << "CreateProcess failed with error (" << errorCode
+            << "): " << (char*)errorMsg << std::endl;
+        LocalFree(errorMsg);
+    }
+
+    bool initializeUCI() {
+        sendCommand("uci\n");
+        std::cout << "Sent 'uci' command to the engine." << std::endl;
+        if (!waitForResponse(uciOkReceived, "uciok")) {
+            return false;
+        }
+
+        sendCommand("isready\n");
+        std::cout << "Sent 'isready' command to the engine." << std::endl;
+        return waitForResponse(readyOkReceived, "readyok");
+    }
+
+    bool waitForResponse(bool& flag, const std::string& expectedResponse) {
+        std::unique_lock<std::mutex> lock(engineMutex);
+        if (!engineCondition.wait_for(lock, std::chrono::seconds(5),
+            [&flag]() { return flag; })) {
+            std::cerr << "Timeout waiting for '" << expectedResponse << "' from engine." << std::endl;
+            return false;
+        }
+        std::cout << "Received '" << expectedResponse << "' from the engine." << std::endl;
         return true;
     }
 
@@ -223,39 +197,41 @@ private:
         DWORD bytesRead;
         CHAR buffer[4096];
         std::string leftover;
+
         while (engineReady) {
-            BOOL success = ReadFile(childStd_OUT_Rd, buffer, sizeof(buffer) - 1,
-                &bytesRead, NULL);
+            BOOL success = ReadFile(childStd_OUT_Rd, buffer, sizeof(buffer) - 1, &bytesRead, NULL);
             if (!success || bytesRead == 0) {
                 break;
             }
+
             buffer[bytesRead] = '\0';
             std::string output(buffer);
-
             output = leftover + output;
 
-            // Process the output line by line
-            size_t pos = 0;
-            size_t newlinePos;
-            while ((newlinePos = output.find_first_of("\r\n", pos)) != std::string::npos) {
-                std::string line = output.substr(pos, newlinePos - pos);
-                processEngineOutputLine(line);
-                // Skip over consecutive \r\n characters
-                pos = output.find_first_not_of("\r\n", newlinePos);
-                if (pos == std::string::npos) {
-                    pos = output.size();
-                }
-            }
-
-            // Save any leftover output for next time
-            leftover = output.substr(pos);
+            processOutput(output, leftover);
         }
     }
 
+    void processOutput(std::string& output, std::string& leftover) {
+        size_t pos = 0, newlinePos;
+
+        while ((newlinePos = output.find_first_of("\r\n", pos)) != std::string::npos) {
+            std::string line = output.substr(pos, newlinePos - pos);
+            processEngineOutputLine(line);
+            pos = output.find_first_not_of("\r\n", newlinePos);
+            if (pos == std::string::npos) {
+                pos = output.size();
+            }
+        }
+        leftover = output.substr(pos);
+    }
+
     void processEngineOutputLine(const std::string& line) {
-        if (line.empty()) return; // Ignore empty lines
-        std::cout << "Engine Output: " << line << std::endl; // Debug output
+        if (line.empty()) return;
+
+        std::cout << "Engine Output: " << line << std::endl;
         std::lock_guard<std::mutex> lock(engineMutex);
+
         if (line == "uciok") {
             uciOkReceived = true;
             engineCondition.notify_all();
@@ -265,26 +241,22 @@ private:
             engineCondition.notify_all();
         }
         else if (line.find("bestmove") == 0) {
-            if (line.find("bestmove (none)") != std::string::npos) {
-                // The engine has no move; checkmate or stalemate
-                engineResponses.push_back("none");
-                engineCondition.notify_all();
-            }
-            else {
-                std::string bestMove = line.substr(9, 4);
-                engineResponses.push_back(bestMove);
-                engineCondition.notify_all();
-            }
+            std::string bestMove = line.find("bestmove (none)") != std::string::npos
+                ? "none"
+                : line.substr(9, 4);
+            engineResponses.push_back(bestMove);
+            engineCondition.notify_all();
         }
     }
 
     bool writeToEngine(const std::string& command) {
         DWORD bytesWritten;
-        BOOL success = WriteFile(childStd_IN_Wr, command.c_str(), command.size(),
-            &bytesWritten, NULL);
+        BOOL success = WriteFile(childStd_IN_Wr, command.c_str(), command.size(), &bytesWritten, NULL);
         return success && bytesWritten == command.size();
     }
 };
+
+
 
 //Some global functions and variables
 //Get constant values for setting up positions
@@ -448,7 +420,7 @@ void initialiseBoard(GLuint programID)
     for (int i = 0; i < 9; i++)
     {
         ranks[i] = -1*( -halfChessBoardSize + boxSize / 2 + (i - 1) * boxSize);
-        files[i + 96] = -1*( -halfChessBoardSize + boxSize / 2 + (i - 1) * boxSize);
+        files[i + 96] = ( -halfChessBoardSize + boxSize / 2 + (i - 1) * boxSize);
 
         std::cout << "Rank " << i << " " << ranks[i] << " files  " << files[i + 96] << "\n";
     }
@@ -576,42 +548,39 @@ void renderPieces(glm::vec3 piecePosition, GLuint ModelMatrixID, GLuint MatrixID
         100.0f
     );
 
-   /* for (const auto& position : piecePosition)
-    {*/
-        glm::mat4 pieceModelMatrix = glm::mat4(1.0f);
+    glm::mat4 pieceModelMatrix = glm::mat4(1.0f);
 
-        // Apply scaling
-        float pieceScale = 0.3f;
-        pieceModelMatrix = glm::scale(pieceModelMatrix, glm::vec3(pieceScale));
+    // Apply scaling
+    float pieceScale = 0.3f;
+    pieceModelMatrix = glm::scale(pieceModelMatrix, glm::vec3(pieceScale));
 
         
-        // Translate the piece to its position
-        pieceModelMatrix = glm::translate(pieceModelMatrix, piecePosition);
-        //pieceModelMatrix = glm::translate(pieceModelMatrix, position);
+    // Translate the piece to its position
+    pieceModelMatrix = glm::translate(pieceModelMatrix, piecePosition);
+    //pieceModelMatrix = glm::translate(pieceModelMatrix, position);
 
-        // Rotate the piece if necessary
-        pieceModelMatrix = glm::rotate(pieceModelMatrix, glm::radians(-90.0f),
-            glm::vec3(0.0f, 0.0f, 1.0f));
-        pieceModelMatrix = glm::rotate(pieceModelMatrix, glm::radians(90.0f),
-            glm::vec3(1.0f, 0.0f, 0.0f));
+    // Rotate the piece if necessary
+    pieceModelMatrix = glm::rotate(pieceModelMatrix, glm::radians(-90.0f),
+        glm::vec3(0.0f, 0.0f, 1.0f));
+    pieceModelMatrix = glm::rotate(pieceModelMatrix, glm::radians(90.0f),
+        glm::vec3(1.0f, 0.0f, 0.0f));
 
-        // Compute MVP matrix
-        glm::mat4 pieceMVP = ProjectionMatrix * ViewMatrix * pieceModelMatrix;
+    // Compute MVP matrix
+    glm::mat4 pieceMVP = ProjectionMatrix * ViewMatrix * pieceModelMatrix;
 
-        // Send uniforms to the shader
-        glUniformMatrix4fv(ModelMatrixID, 1, GL_FALSE, &pieceModelMatrix[0][0]);
-        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &pieceMVP[0][0]);
+    // Send uniforms to the shader
+    glUniformMatrix4fv(ModelMatrixID, 1, GL_FALSE, &pieceModelMatrix[0][0]);
+    glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &pieceMVP[0][0]);
 
-        if (isWhite) {
-            glUniform4f(ColorID, 4.5f, 4.5f, 4.5f, 4.5f);
-        }
-        else {
-            glUniform4f(ColorID, 1.5f, 1.5f, 1.5f, 1.5f);
-        }
+    if (isWhite) {
+        glUniform4f(ColorID, 4.5f, 4.5f, 4.5f, 4.5f);
+    }
+    else {
+        glUniform4f(ColorID, 1.5f, 1.5f, 1.5f, 1.5f);
+    }
 
-        // Render the piece
-        pieceModel.RenderModel();
-    //}
+    // Render the piece
+    pieceModel.RenderModel();
 }
 
 void renderAll(GLuint ModelMatrixID, GLuint MatrixID, GLuint ColorID)
@@ -810,6 +779,7 @@ void parse(string in, GLuint programID, ECE_ChessEngine& chessEngine)
     {
         std::cout << "Thanks for playing!!";
         glfwSetWindowShouldClose(window, true);
+        return;
     }
     if (in == "Play")
     {
@@ -1216,12 +1186,13 @@ int main(void)
         //keyBinds();
 
     } while (!glfwWindowShouldClose(window));
-
+    //cout << "QUIT";
     // Cleanup VBO and shader
     glDeleteProgram(programID);
 
     // Close OpenGL window and terminate GLFW
     glfwTerminate();
-
+    
+    exit(0);
     return 0;
 }
