@@ -39,7 +39,7 @@ using namespace glm;
 
 using namespace std;
 
-
+// If line has word ponder 0000; move is illegal
 class ECE_ChessEngine {
 public:
     ECE_ChessEngine(const std::string& path)
@@ -229,7 +229,7 @@ private:
     void processEngineOutputLine(const std::string& line) {
         if (line.empty()) return;
 
-        std::cout << "Engine Output: " << line << std::endl;
+//        std::cout << "Engine Output: " << line << std::endl;
         std::lock_guard<std::mutex> lock(engineMutex);
 
         if (line == "uciok") {
@@ -411,6 +411,19 @@ struct allPiece
 
         //std::cout << "Piece at r " << ranks[rank] << " file " << file <<" "<< files[file] << "\n";
     }
+    void updatePos_kill(piece& p, int killID)
+    {
+        p.file = killID;
+        p.rank = killID;
+
+        p.zPos = 0.0f;
+        p.xPos = killRank[killID];
+        p.yPos = killFile[killID];
+
+        p.pos = glm::vec3(p.xPos, p.yPos, p.zPos);
+
+        //std::cout << "Piece at r " << ranks[rank] << " file " << file <<" "<< files[file] << "\n";
+    }
 
 }allPieces;
 
@@ -429,42 +442,6 @@ void initialiseBoard(GLuint programID)
         killRank[i] = 1000;
         killFile[i] = 1000;
     }
-//HERE
-    //for (int i = 0; i < 8; i++)
-    //{
-    //    for (int j=0; j<4; j++)
-    //    {
-    //        killFile[4 * i + j] = ;
-    //        //killFile[4 * i + j] = (-1 * (-halfChessBoardSize + boxSize / 2 + (j - 1) * boxSize));
-    //        switch (j) 
-    //        {
-    //            case 0:
-    //            {
-    //                killRank[4 * i + j] = 90;
-    //                break;
-    //            }
-    //            case 1:
-    //            {
-    //                killRank[4 * i + j] = -75;
-    //                break;
-    //            }
-    //            case 2:
-    //            {
-    //                killRank[4 * i + j] = 100;
-    //                break;
-    //            }
-    //            case 3:
-    //            {
-    //                killRank[4 * i + j] = -85;
-    //                break;
-    //            }
-    //            default:
-    //                break;
-    //        }
-    //        std::cout << "Kill rank " << 4 * i + j << " " << killRank[4 * i + j] << " file  " << killFile[4 * i + j] << "\n";
-    //    }
-    //}
-
 
     //set pieces
     allPieces.updatePos(allPieces.blackPawn1, 'a', 7);
@@ -728,7 +705,7 @@ bool toMove(string initial, string final)
                 return false;
             }
             
-            allPieces.updatePos(*foundPiece_toKill, killRank[killID], killFile[killID]);
+            allPieces.updatePos_kill(*foundPiece_toKill, killID);
             std::cout << "Piece destroyed\n";
             killID++;
         }
@@ -1087,7 +1064,7 @@ int main(void)
         double currentTime = glfwGetTime();
         nFrames++;
         if (currentTime - lastTime >= 1.0) {
-            printf("%f ms/frame\n", 1000.0 / double(nFrames));
+            //printf("%f ms/frame\n", 1000.0 / double(nFrames));
             nFrames = 0;
             lastTime += 1.0;
         }
