@@ -23,7 +23,7 @@ using namespace glm;
 #include "Windows.h"
 #include <regex>
 
-
+//#include <unistd.h>
 #include <map>
 #include <string>
 #include <iostream>
@@ -294,6 +294,7 @@ float halfChessBoardSize = ChessBoardSize / 2.0f;
 int start = 0;
 bool specularDiffuseEnabled = true;
 int killID = 0;
+bool myMove = false;
 
 string move_history = "";
 
@@ -370,12 +371,18 @@ struct piece
 
 struct models
 {
-    CAssimpModel pawnModel;
-    CAssimpModel rookModel;
-    CAssimpModel knightModel;
-    CAssimpModel bishopModel;
-    CAssimpModel queenModel;
-    CAssimpModel kingModel;
+    CAssimpModel pawnModel_dark;
+    CAssimpModel rookModel_dark;
+    CAssimpModel knightModel_dark;
+    CAssimpModel bishopModel_dark;
+    CAssimpModel queenModel_dark;
+    CAssimpModel kingModel_dark;
+    CAssimpModel pawnModel_light;
+    CAssimpModel rookModel_light;
+    CAssimpModel knightModel_light;
+    CAssimpModel bishopModel_light;
+    CAssimpModel queenModel_light;
+    CAssimpModel kingModel_light;
 } pieceModels;
 
 //Struct for all chess pieces
@@ -607,40 +614,40 @@ void renderPieces(glm::vec3 piecePosition, GLuint ModelMatrixID, GLuint MatrixID
 void renderAll(GLuint ModelMatrixID, GLuint MatrixID, GLuint ColorID)
 {
     //Black
-    renderPieces(allPieces.blackPawn1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
-    renderPieces(allPieces.blackPawn2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
-    renderPieces(allPieces.blackPawn3.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
-    renderPieces(allPieces.blackPawn4.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
-    renderPieces(allPieces.blackPawn5.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
-    renderPieces(allPieces.blackPawn6.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
-    renderPieces(allPieces.blackPawn7.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
-    renderPieces(allPieces.blackPawn8.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
-    renderPieces(allPieces.blackRook1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.rookModel, false);
-    renderPieces(allPieces.blackKnight1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.knightModel, false);
-    renderPieces(allPieces.blackBishop1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.bishopModel, false);
-    renderPieces(allPieces.blackQueen.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.queenModel, false);
-    renderPieces(allPieces.blackKing.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.kingModel, false);
-    renderPieces(allPieces.blackBishop2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.bishopModel, false);
-    renderPieces(allPieces.blackKnight2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.knightModel, false);
-    renderPieces(allPieces.blackRook2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.rookModel, false);
+    renderPieces(allPieces.blackPawn1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel_dark, false);
+    renderPieces(allPieces.blackPawn2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel_dark, false);
+    renderPieces(allPieces.blackPawn3.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel_dark, false);
+    renderPieces(allPieces.blackPawn4.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel_dark, false);
+    renderPieces(allPieces.blackPawn5.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel_dark, false);
+    renderPieces(allPieces.blackPawn6.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel_dark, false);
+    renderPieces(allPieces.blackPawn7.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel_dark, false);
+    renderPieces(allPieces.blackPawn8.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel_dark, false);
+    renderPieces(allPieces.blackRook1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.rookModel_dark, false);
+    renderPieces(allPieces.blackKnight1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.knightModel_dark, false);
+    renderPieces(allPieces.blackBishop1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.bishopModel_dark, false);
+    renderPieces(allPieces.blackQueen.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.queenModel_dark, false);
+    renderPieces(allPieces.blackKing.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.kingModel_dark, false);
+    renderPieces(allPieces.blackBishop2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.bishopModel_dark, false);
+    renderPieces(allPieces.blackKnight2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.knightModel_dark, false);
+    renderPieces(allPieces.blackRook2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.rookModel_dark, false);
 
     //White
-    renderPieces(allPieces.whitePawn1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
-    renderPieces(allPieces.whitePawn2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
-    renderPieces(allPieces.whitePawn3.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
-    renderPieces(allPieces.whitePawn4.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
-    renderPieces(allPieces.whitePawn5.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
-    renderPieces(allPieces.whitePawn6.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
-    renderPieces(allPieces.whitePawn7.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
-    renderPieces(allPieces.whitePawn8.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel, false);
-    renderPieces(allPieces.whiteRook1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.rookModel, false);
-    renderPieces(allPieces.whiteKnight1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.knightModel, false);
-    renderPieces(allPieces.whiteBishop1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.bishopModel, false);
-    renderPieces(allPieces.whiteQueen.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.queenModel, false);
-    renderPieces(allPieces.whiteKing.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.kingModel, false);
-    renderPieces(allPieces.whiteBishop2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.bishopModel, false);
-    renderPieces(allPieces.whiteKnight2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.knightModel, false);
-    renderPieces(allPieces.whiteRook2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.rookModel, false);
+    renderPieces(allPieces.whitePawn1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel_light, false);
+    renderPieces(allPieces.whitePawn2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel_light, false);
+    renderPieces(allPieces.whitePawn3.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel_light, false);
+    renderPieces(allPieces.whitePawn4.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel_light, false);
+    renderPieces(allPieces.whitePawn5.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel_light, false);
+    renderPieces(allPieces.whitePawn6.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel_light, false);
+    renderPieces(allPieces.whitePawn7.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel_light, false);
+    renderPieces(allPieces.whitePawn8.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.pawnModel_light, false);
+    renderPieces(allPieces.whiteRook1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.rookModel_light, false);
+    renderPieces(allPieces.whiteKnight1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.knightModel_light, false);
+    renderPieces(allPieces.whiteBishop1.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.bishopModel_light, false);
+    renderPieces(allPieces.whiteQueen.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.queenModel_light, false);
+    renderPieces(allPieces.whiteKing.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.kingModel_light, false);
+    renderPieces(allPieces.whiteBishop2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.bishopModel_light, false);
+    renderPieces(allPieces.whiteKnight2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.knightModel_light, false);
+    renderPieces(allPieces.whiteRook2.pos, ModelMatrixID, MatrixID, ColorID, pieceModels.rookModel_light, false);
 }
 
 // Function to handle camera inputs
@@ -920,8 +927,10 @@ void parse(string in, GLuint programID, ECE_ChessEngine& chessEngine)
         move_done = toMove(initial, final);
         if (move_done)
         {
-            cout << "Calling Komodo\n";
-            useKomodo(chessEngine);
+            myMove = true;
+            //Sleep(1);
+            //cout << "Calling Komodo\n";
+            //useKomodo(chessEngine);
         }
     }
     else
@@ -942,7 +951,8 @@ bool loadModel(CAssimpModel& model, char* filePath)
     return true;
 }
 
-int main(void) {
+int main(void) 
+{
     // Initialize GLFW
     if (!glfwInit()) {
         fprintf(stderr, "Failed to initialize GLFW\n");
@@ -997,28 +1007,55 @@ int main(void) {
 
     //Load pieces model using the function defined
     //CAssimpModel pawnModel;
-    if (!loadModel(pieceModels.pawnModel, "../ChessGame/Chess/pawn.obj"))
+    if (!loadModel(pieceModels.pawnModel_light, "../ChessGame/Chess/pawn_light.obj"))
     {
         return -1;
     }
-    if (!loadModel(pieceModels.kingModel, "../ChessGame/Chess/king.obj"))
+    if (!loadModel(pieceModels.kingModel_light, "../ChessGame/Chess/king_light.obj"))
     {
         return -1;
     }
-    if (!loadModel(pieceModels.queenModel, "../ChessGame/Chess/queen.obj"))
+    if (!loadModel(pieceModels.queenModel_light, "../ChessGame/Chess/queen_light.obj"))
     {
         return -1;
     }
-    CAssimpModel rookModel;
-    if (!loadModel(pieceModels.rookModel, "../ChessGame/Chess/rook.obj"))
-    {
-        return -1;
-    }CAssimpModel knightModel;
-    if (!loadModel(pieceModels.knightModel, "../ChessGame/Chess/knight.obj"))
+    //CAssimpModel rookModel;
+    if (!loadModel(pieceModels.rookModel_light, "../ChessGame/Chess/rook_light.obj"))
     {
         return -1;
     }
-    if (!loadModel(pieceModels.bishopModel, "../ChessGame/Chess/bishop.obj"))
+    //CAssimpModel knightModel;
+    if (!loadModel(pieceModels.knightModel_light, "../ChessGame/Chess/knight_light.obj"))
+    {
+        return -1;
+    }
+    if (!loadModel(pieceModels.bishopModel_light, "../ChessGame/Chess/bishop_light.obj"))
+    {
+        return -1;
+    }
+    if (!loadModel(pieceModels.pawnModel_dark, "../ChessGame/Chess/pawn_dark.obj"))
+    {
+        return -1;
+    }
+    if (!loadModel(pieceModels.kingModel_dark, "../ChessGame/Chess/king_dark.obj"))
+    {
+        return -1;
+    }
+    if (!loadModel(pieceModels.queenModel_dark, "../ChessGame/Chess/queen_dark.obj"))
+    {
+        return -1;
+    }
+    //CAssimpModel rookModel;
+    if (!loadModel(pieceModels.rookModel_dark, "../ChessGame/Chess/rook_dark.obj"))
+    {
+        return -1;
+    }
+    //CAssimpModel knightModel;
+    if (!loadModel(pieceModels.knightModel_dark, "../ChessGame/Chess/knight_dark.obj"))
+    {
+        return -1;
+    }
+    if (!loadModel(pieceModels.bishopModel_dark, "../ChessGame/Chess/bishop_dark.obj"))
     {
         return -1;
     }
@@ -1153,11 +1190,21 @@ int main(void) {
         glfwSwapBuffers(window);
         glfwPollEvents();
 
-        if (start == 0)
-            cout << "Type Play to start: ";
+        if (!myMove)
+        {
+            if (start == 0)
+                cout << "Type Play to start: ";
+            else
+                cout << "Please enter a command: ";
+            std::getline(std::cin, in);
+        }
         else
-            cout << "Please enter a command: ";
-        std::getline(std::cin, in);
+        {
+            Sleep(1000);
+            cout << "Calling Komodo\n";
+            useKomodo(chessEngine);
+            myMove = false;
+        }
 
         //Parse the string input
         parse(in, programID, chessEngine);

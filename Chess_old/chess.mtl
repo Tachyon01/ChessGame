@@ -1,0 +1,72 @@
+newmtl wooddark0
+Ka 0 0 0
+Ns 4.73772
+Ks 0.623529 0.639216 0.560784
+Kd 0.161551 0.0413659 0.00220712
+map_Kd wooddark0.jpg
+newmtl wooddark1
+Ka 0 0 0
+Ns 4.73772
+Ks 0.623529 0.639216 0.560784
+Kd 0.161551 0.0413659 0.00220712
+map_Kd wooddark1.jpg
+newmtl wooddark2
+Ka 0 0 0
+Ns 4.73772
+Ks 0.623529 0.639216 0.560784
+Kd 0.161551 0.0413659 0.00220712
+map_Kd wooddark2.jpg
+newmtl wooddark3
+Ka 0 0 0
+Ns 4.73772
+Ks 0.623529 0.639216 0.560784
+Kd 0.161551 0.0413659 0.00220712
+map_Kd wooddark3.jpg
+newmtl wooddark4
+Ka 0 0 0
+Ns 4.73772
+Ks 0.623529 0.639216 0.560784
+Kd 0.161551 0.0413659 0.00220712
+map_Kd wooddark4.jpg
+newmtl wooddark5
+Ka 0 0 0
+Ns 4.73772
+Ks 0.623529 0.639216 0.560784
+Kd 0.161551 0.0413659 0.00220712
+map_Kd wooddark5.jpg
+newmtl woodlight0
+Ka 0 0 0
+Ns 37.0071
+Ks 0.623529 0.639216 0.560784
+Kd 0.646162 0.565369 0.434441
+map_Kd woodlight0.jpg
+newmtl woodlight1
+Ka 0 0 0
+Ns 37.0071
+Ks 0.623529 0.639216 0.560784
+Kd 0.646162 0.565369 0.434441
+map_Kd woodlight1.jpg
+newmtl woodlight2
+Ka 0 0 0
+Ns 37.0071
+Ks 0.623529 0.639216 0.560784
+Kd 0.646162 0.565369 0.434441
+map_Kd woodlight2.jpg
+newmtl woodlight3
+Ka 0 0 0
+Ns 37.0071
+Ks 0.623529 0.639216 0.560784
+Kd 0.646162 0.565369 0.434441
+map_Kd woodlight3.jpg
+newmtl woodlight4
+Ka 0 0 0
+Ns 37.0071
+Ks 0.623529 0.639216 0.560784
+Kd 0.646162 0.565369 0.434441
+map_Kd woodlight4.jpg
+newmtl woodlight5
+Ka 0 0 0
+Ns 37.0071
+Ks 0.623529 0.639216 0.560784
+Kd 0.646162 0.565369 0.434441
+map_Kd woodlight5.jpg

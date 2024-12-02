@@ -1,3 +1,19 @@
+# Dark Wood Material
+newmtl wooddark0_n
+Ka 0.05 0.05 0.05  # Slight ambient reflection
+Kd 0.3 0.2 0.1     # Diffuse color (enhanced dark wood tone)
+Ks 0.5 0.5 0.5     # Specular highlights
+Ns 50              # Shininess (higher value for smoother surface)
+map_Kd wooddark0.jpg
+
+# Light Wood Material
+newmtl woodlight0_n
+Ka 0.1 0.1 0.1     # Slight ambient reflection
+Kd 0.7 0.6 0.5     # Diffuse color (light wood tone)
+Ks 0.6 0.6 0.6     # Specular highlights
+Ns 60              # Shininess (a bit smoother than dark wood)
+map_Kd woodlight0.jpg
+
 newmtl wooddark0
 Ka 0 0 0
 Ns 4.73772
