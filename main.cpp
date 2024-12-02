@@ -316,15 +316,15 @@ struct camera
     float verticalAngle = glm::radians(20.0f);
 
     float x = 17.1;
-    float y = 0.0;
-    float z = 47.0;
+    float y = 47.0;
+    float z = 0.0;
 
 
     void get_Cartesian()
     {
         x = radius * sin(verticalAngle) * cos(horizontalAngle);
-        y = radius * cos(verticalAngle);
-        z = radius * sin(verticalAngle) * sin(horizontalAngle);
+        z = radius * cos(verticalAngle);
+        y = radius * sin(verticalAngle) * sin(horizontalAngle);
     }
 
     //bool specularDiffuseEnabled = true;
@@ -345,8 +345,8 @@ struct light
     void get_Cartesian()
     {
         x = radius * sin(verticalAngle) * cos(horizontalAngle);
-        y = radius * cos(verticalAngle);
-        z = radius * sin(verticalAngle) * sin(horizontalAngle);
+        z = radius * cos(verticalAngle);
+        y = radius * sin(verticalAngle) * sin(horizontalAngle);
     }
 
     float power = 3000.0f;
@@ -431,9 +431,9 @@ struct allPiece
         p.file = file;
         p.rank = rank;
 
-        p.yPos = 0.0f;
+        p.zPos = 0.0f;
         p.xPos = ranks[rank];
-        p.zPos = files[file];
+        p.yPos = files[file];
 
         p.pos = glm::vec3(p.xPos, p.yPos, p.zPos);
 
@@ -560,7 +560,7 @@ void renderPieces(glm::vec3 piecePosition, GLuint ModelMatrixID, GLuint MatrixID
     // Camera looks at the origin
     glm::vec3 targetCamera = glm::vec3(0.0f, 0.0f, 0.0f);
     // Up vector
-    glm::vec3 upVector = glm::vec3(0.0f, 1.0f, 0.0f);
+    glm::vec3 upVector = glm::vec3(0.0f, 0.0f, 1.0f);
     //View matrix
     glm::mat4 ViewMatrix = glm::lookAt(
         positionCamera,
@@ -584,13 +584,16 @@ void renderPieces(glm::vec3 piecePosition, GLuint ModelMatrixID, GLuint MatrixID
         float pieceScale = 0.3f;
         pieceModelMatrix = glm::scale(pieceModelMatrix, glm::vec3(pieceScale));
 
-        // Rotate the piece if necessary
-        pieceModelMatrix = glm::rotate(pieceModelMatrix, glm::radians(0.0f),
-            glm::vec3(1.0f, 0.0f, 0.0f));
-
+        
         // Translate the piece to its position
         pieceModelMatrix = glm::translate(pieceModelMatrix, piecePosition);
         //pieceModelMatrix = glm::translate(pieceModelMatrix, position);
+
+        // Rotate the piece if necessary
+        pieceModelMatrix = glm::rotate(pieceModelMatrix, glm::radians(-90.0f),
+            glm::vec3(0.0f, 0.0f, 1.0f));
+        pieceModelMatrix = glm::rotate(pieceModelMatrix, glm::radians(90.0f),
+            glm::vec3(1.0f, 0.0f, 0.0f));
 
         // Compute MVP matrix
         glm::mat4 pieceMVP = ProjectionMatrix * ViewMatrix * pieceModelMatrix;
@@ -1136,7 +1139,7 @@ int main(void)
         glm::vec3 targetCamera = glm::vec3(0.0f, 0.0f, 0.0f);
 
         // Up vector
-        glm::vec3 upVector = glm::vec3(0.0f, 1.0f, 0.0f);
+        glm::vec3 upVector = glm::vec3(0.0f, 0.0f, 1.0f);
 
         // Compute the ViewMatrix
         glm::mat4 ViewMatrix = glm::lookAt(
@@ -1168,8 +1171,8 @@ int main(void)
             chessboardModelMatrix = glm::scale(chessboardModelMatrix, glm::vec3(chessboardScale));
 
             // Rotate the chessboard if necessary
-            chessboardModelMatrix = glm::rotate(chessboardModelMatrix, glm::radians(-90.0f),
-                glm::vec3(1.0, 0.0, 0.0));
+            //chessboardModelMatrix = glm::rotate(chessboardModelMatrix, glm::radians(-90.0f),
+                //glm::vec3(1.0, 0.0, 0.0));
             chessboardModelMatrix = glm::rotate(chessboardModelMatrix, glm::radians(90.0f),
                 glm::vec3(0.0, 0.0, 1.0));
             glm::mat4 chessboardMVP = ProjectionMatrix * ViewMatrix * chessboardModelMatrix;
@@ -1209,7 +1212,7 @@ int main(void)
         //Parse the string input
         parse(in, programID, chessEngine);
 
-        //// Handle camera inputs
+        // Handle camera inputs
         //keyBinds();
 
     } while (!glfwWindowShouldClose(window));
