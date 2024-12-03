@@ -357,32 +357,14 @@ Piece* toMove(string initial, string final)
     int destroying = 0;
     Piece* foundPiece_toMove = findPiece(allPieces, initial[0], int(initial[1] - '0'));
     pieceToKill = findPiece(allPieces, final[0], int(final[1] - '0'));
-    if (foundPiece_toMove == nullptr)
-    {
-        std::cout << "No piece at given place\n";
-        moveHappened = false;
-        return nullptr;
-    }
-    else
-    {
-        if (pieceToKill)
-        {
-            if (pieceToKill->isWhite == foundPiece_toMove->isWhite)
-            {
-                std::cout << "Cant destroy piece of same color\n";
-                pieceToKill = nullptr;
-                return nullptr;
-            }
-        }
-        //Add move to history
+    //Add move to history
 
-        initialPos = initial;
-        finalPos = final;
-        moveHappened = true;
-        move_history += " " + initial + final;
+    initialPos = initial;
+    finalPos = final;
+    moveHappened = true;
+    move_history += " " + initial + final;
 
-        return foundPiece_toMove;
-    }
+    return foundPiece_toMove;
 }
 
 Piece* useKomodo(ECE_ChessEngine& chessEngine)
@@ -420,7 +402,221 @@ Piece* useKomodo(ECE_ChessEngine& chessEngine)
     return nullptr;
 }
 
-//EDIT HERE
+bool validateMove(string initial, string final)
+{
+    Piece* pieceToMove = findPiece(allPieces, initial[0], int(initial[1] - '0'));
+    pieceToKill = findPiece(allPieces, final[0], int(final[1] - '0'));
+    if (pieceToMove == nullptr)
+    {
+        std::cout << "No piece at given place\n";
+        //moveHappened = false;
+        return false;
+    }
+    else
+    {
+        if (pieceToKill)
+        {
+            if (pieceToKill->isWhite == pieceToMove->isWhite)
+            {
+                std::cout << "Cant destroy piece of same color\n";
+                pieceToKill = nullptr;
+                return false;
+            }
+        }
+    }
+
+    //Now check for each piece type
+
+    //if pawn
+    if (pieceToMove->variety == "Pawn")
+    {
+        //non capture
+        if (!pieceToKill)
+        {
+            //1 forward
+            if ((final[0] == initial[0]) && ((final[1] - initial[1]) == 1))
+            {
+                return true;
+            }
+            //2 forward
+            if ((final[0] == initial[0]) && (final[1] - '0' == 4) && (initial[1] - '0' == 2) && !(findPiece(allPieces, initial[0], initial[1] + 1)))
+            {
+                return true;
+            }
+        }
+        else //capture
+        {
+            if ((abs(final[0] - initial[0]) == 1) && ((final[1] - initial[1]) == 1))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    //if knight
+    if (pieceToMove->variety == "Knight")
+    {
+        int dx = abs(final[0] - initial[0]);
+        int dy = abs(final[1] - initial[1]);
+        if ((dx == 2 && dy == 1) || (dx == 1 && dy == 2)) 
+        {
+            return true;
+        }
+        return false;
+    }
+
+    //if bishop
+    if (pieceToMove->variety == "Bishop")
+    {
+        //check if not diagonal
+        if (abs(final[0] - initial[0]) != abs(final [1] - initial[1]))
+        {
+            std::cout << "Bishop moves diagonal\n";
+            return false;
+        }
+
+        // Calculate the direction of the move
+        int xDir = (final[0] > initial[0]) ? 1 : -1; // 1 if moving right, -1 if moving left
+        int yDir = (final[1] > initial[1]) ? 1 : -1; // 1 if moving up, -1 if moving down
+
+        // Check for obstacles along the diagonal
+        char x = initial[0] + xDir;
+        int y = initial[1] - '0' + yDir;
+
+        while (x != final[0] && y != int(final[1] - '0'))
+        {
+            if (findPiece(allPieces, x, y))
+            {
+                std::cout << "Obstacle in path\n";
+                return false;
+            }
+            
+            x += xDir;
+            y += yDir;
+        }
+        return true;
+    }
+
+    //if rook
+    if (pieceToMove->variety == "Rook")
+    {
+        //valid directions
+        if ((final[0] != initial[0]) && (final[1] != initial[1]))
+        {
+            std::cout << "Rook moves either horizontally or vertically\n";
+            return false;
+        }
+
+        //check obstacle
+        if (final[0] == initial[0]) //vertical
+        {
+            int delta = (final[1] > initial[1]) ? 1:-1;
+            for (int i = (initial[1] - '0') + delta; i != (final[1] - '0'); i++)
+            {
+                if (findPiece(allPieces, initial[0], i))
+                {
+                    cout << "Obstacle in path\n";
+                    return false;
+                }
+            }
+        }
+        if (final[1] == initial[1]) //horizontal
+        {
+            int delta = (final[0] > initial[0]) ? 1:-1;
+            for (char i = initial[0] + delta; i != final[0]; i++)
+            {
+                if (findPiece(allPieces, i, int(initial[1] -'0')))
+                {
+                    cout << "Obstacle in path\n";
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    //if Queen
+    if (pieceToMove->variety == "Queen")
+    {
+        //Like Rook
+        if ((final[0] == initial[0]) || (final[1] == initial[1]))
+        {
+            if (final[0] == initial[0]) //vertical
+            {
+                int delta = (final[1] > initial[1]) ? 1 : -1;
+                for (int i = (initial[1] - '0') + delta; i != (final[1] - '0'); i++)
+                {
+                    if (findPiece(allPieces, initial[0], i))
+                    {
+                        cout << "Obstacle in path\n";
+                        return false;
+                    }
+                }
+            }
+            if (final[1] == initial[1]) //horizontal
+            {
+                int delta = (final[0] > initial[0]) ? 1 : -1;
+                for (char i = initial[0] + delta; i != final[0]; i++)
+                {
+                    if (findPiece(allPieces, i, int(initial[1] - '0')))
+                    {
+                        cout << "Obstacle in path\n";
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+    
+
+        //Like Bishop
+        if (abs(final[0] - initial[0]) == abs(final[1] - initial[1]))
+        {
+            // Calculate the direction of the move
+            int xDir = (final[0] > initial[0]) ? 1 : -1; // 1 if moving right, -1 if moving left
+            int yDir = (final[1] > initial[1]) ? 1 : -1; // 1 if moving up, -1 if moving down
+
+            // Check for obstacles along the diagonal
+            char x = initial[0] + xDir;
+            int y = initial[1] - '0' + yDir;
+
+            while (x != final[0] && y != int(final[1] - '0'))
+            {
+                if (findPiece(allPieces, x, y))
+                {
+                    std::cout << "Obstacle in path\n";
+                    return false;
+                }
+
+                x += xDir;
+                y += yDir;
+            }
+            return true;
+        }
+
+        //Invalid move
+        cout << "Invalid Queen move \n";
+        return false;
+        
+    }
+     
+    //if King
+    if (pieceToMove->variety == "King")
+    {
+        if ((abs(final[0] - initial[0]) > 1) || (abs(final[1] - initial[1]) > 1))
+        {
+            cout << "King moves 1 space in any direction\n";
+            return false;
+        }
+        return true;
+    }
+
+    return true;
+}
+
+
+
 Piece* parse(string in, GLuint programID, ECE_ChessEngine& chessEngine, GLuint ModelMatrixID, GLuint MatrixID, GLuint ColorID)
 {
     moveHappened = false;
@@ -573,6 +769,11 @@ Piece* parse(string in, GLuint programID, ECE_ChessEngine& chessEngine, GLuint M
         }
         bool move_done = false;
         Piece* pieceToMove;
+        if (!validateMove(initial, final))
+        {
+            std::cerr << "Invalid Move: " << in << std::endl;
+            return nullptr;
+        }
         pieceToMove = toMove(initial, final);
         if (pieceToMove)
         {
