@@ -25,8 +25,6 @@ using namespace glm;
 
 //#include <unistd.h>
 #include <map>
-#include <string>
-#include <iostream>
 #include <fstream>
 #include <thread>
 #include <atomic>
@@ -229,7 +227,7 @@ private:
     void processEngineOutputLine(const std::string& line) {
         if (line.empty()) return;
 
-//        std::cout << "Engine Output: " << line << std::endl;
+        //        std::cout << "Engine Output: " << line << std::endl;
         std::lock_guard<std::mutex> lock(engineMutex);
 
         if (line == "uciok") {
@@ -267,6 +265,11 @@ int start = 0;
 bool specularDiffuseEnabled = true;
 int killID = 0;
 bool myMove = false;
+
+string initialPos;
+string finalPos;
+bool moveHappened = false;
+bool komodoMove = false;
 
 string move_history = "";
 
@@ -339,6 +342,8 @@ struct piece
     glm::vec3 pos = glm::vec3(xPos, yPos, zPos);
 
     bool isWhite = true;
+
+    string variety = "Pawn";
 };
 
 struct models
@@ -376,7 +381,7 @@ struct allPiece
     piece blackQueen;
     piece blackKing;
     piece blackBishop2;
-    piece blackKnight2; 
+    piece blackKnight2;
     piece blackRook2;
 
     //white pieces
@@ -398,7 +403,7 @@ struct allPiece
     piece whiteKnight2;
     piece whiteRook2;
 
-    void updatePos(piece &p, char file, int rank)
+    void updatePos(piece& p, char file, int rank)
     {
         p.file = file;
         p.rank = rank;
@@ -424,6 +429,16 @@ struct allPiece
 
         //std::cout << "Piece at r " << ranks[rank] << " file " << file <<" "<< files[file] << "\n";
     }
+    void updatePos_animate(piece& p, float x, float y)
+    {
+        p.zPos = 0.0f;
+        p.xPos = x;
+        p.yPos = y;
+        p.pos = glm::vec3(p.xPos, p.yPos, p.zPos);
+
+        //cout << " Positions " << p.xPos << " " << p.yPos << " " << p.zPos << endl;
+
+    }
 
 }allPieces;
 
@@ -432,8 +447,8 @@ void initialiseBoard(GLuint programID)
     //set values for ranks and files
     for (int i = 0; i < 9; i++)
     {
-        ranks[i] = -1*( -halfChessBoardSize + boxSize / 2 + (i - 1) * boxSize);
-        files[i + 96] = ( -halfChessBoardSize + boxSize / 2 + (i - 1) * boxSize);
+        ranks[i] = -1 * (-halfChessBoardSize + boxSize / 2 + (i - 1) * boxSize);
+        files[i + 96] = (-halfChessBoardSize + boxSize / 2 + (i - 1) * boxSize);
 
         std::cout << "Rank " << i << " " << ranks[i] << " files  " << files[i + 96] << "\n";
     }
@@ -453,14 +468,14 @@ void initialiseBoard(GLuint programID)
     allPieces.updatePos(allPieces.blackPawn7, 'g', 7);
     allPieces.updatePos(allPieces.blackPawn8, 'h', 7);
 
-    allPieces.updatePos(allPieces.blackRook1,   'a', 8);
+    allPieces.updatePos(allPieces.blackRook1, 'a', 8);
     allPieces.updatePos(allPieces.blackKnight1, 'b', 8);
     allPieces.updatePos(allPieces.blackBishop1, 'c', 8);
-    allPieces.updatePos(allPieces.blackQueen,   'd', 8);
-    allPieces.updatePos(allPieces.blackKing,    'e', 8);
+    allPieces.updatePos(allPieces.blackQueen, 'd', 8);
+    allPieces.updatePos(allPieces.blackKing, 'e', 8);
     allPieces.updatePos(allPieces.blackBishop2, 'f', 8);
     allPieces.updatePos(allPieces.blackKnight2, 'g', 8);
-    allPieces.updatePos(allPieces.blackRook2,   'h', 8);
+    allPieces.updatePos(allPieces.blackRook2, 'h', 8);
 
     allPieces.blackPawn1.isWhite = false;
     allPieces.blackPawn2.isWhite = false;
@@ -479,6 +494,14 @@ void initialiseBoard(GLuint programID)
     allPieces.blackKnight2.isWhite = false;
     allPieces.blackRook2.isWhite = false;
 
+    allPieces.blackRook1.variety    = "Rook";
+    allPieces.blackKnight1.variety  = "Knight";
+    allPieces.blackBishop1.variety  = "Bishop";
+    allPieces.blackKing.variety     = "King";
+    allPieces.blackQueen.variety    = "Queen";
+    allPieces.blackBishop2.variety  = "Bishop";
+    allPieces.blackKnight2.variety  = "Knight";
+    allPieces.blackRook2.variety    = "Rook";
 
     //Whites
     allPieces.updatePos(allPieces.whitePawn1, 'a', 2);
@@ -490,14 +513,23 @@ void initialiseBoard(GLuint programID)
     allPieces.updatePos(allPieces.whitePawn7, 'g', 2);
     allPieces.updatePos(allPieces.whitePawn8, 'h', 2);
 
-    allPieces.updatePos(allPieces.whiteRook1,   'a', 1);
+    allPieces.updatePos(allPieces.whiteRook1, 'a', 1);
     allPieces.updatePos(allPieces.whiteKnight1, 'b', 1);
     allPieces.updatePos(allPieces.whiteBishop1, 'c', 1);
-    allPieces.updatePos(allPieces.whiteQueen,   'd', 1);
-    allPieces.updatePos(allPieces.whiteKing,    'e', 1);
+    allPieces.updatePos(allPieces.whiteQueen, 'd', 1);
+    allPieces.updatePos(allPieces.whiteKing, 'e', 1);
     allPieces.updatePos(allPieces.whiteBishop2, 'f', 1);
     allPieces.updatePos(allPieces.whiteKnight2, 'g', 1);
-    allPieces.updatePos(allPieces.whiteRook2,   'h', 1);
+    allPieces.updatePos(allPieces.whiteRook2, 'h', 1);
+
+    allPieces.whiteRook1.variety = "Rook";
+    allPieces.whiteKnight1.variety = "Knight";
+    allPieces.whiteBishop1.variety = "Bishop";
+    allPieces.whiteKing.variety = "King";
+    allPieces.whiteQueen.variety = "Queen";
+    allPieces.whiteBishop2.variety = "Bishop";
+    allPieces.whiteKnight2.variety = "Knight";
+    allPieces.whiteRook2.variety = "Rook";
 }
 
 
@@ -531,7 +563,7 @@ void renderPieces(glm::vec3 piecePosition, GLuint ModelMatrixID, GLuint MatrixID
     float pieceScale = 0.3f;
     pieceModelMatrix = glm::scale(pieceModelMatrix, glm::vec3(pieceScale));
 
-        
+
     // Translate the piece to its position
     pieceModelMatrix = glm::translate(pieceModelMatrix, piecePosition);
     //pieceModelMatrix = glm::translate(pieceModelMatrix, position);
@@ -682,53 +714,45 @@ piece* findPiece(allPiece& pieces, char file, int rank)
     return nullptr;
 }
 
+piece* pieceToKill;
+
 //Do Komodo's move as well 
-bool toMove(string initial, string final)
+piece* toMove(string initial, string final)
 {
     //Find piece
     int found = 0;
+    int destroying = 0;
     piece* foundPiece_toMove = findPiece(allPieces, initial[0], int(initial[1] - '0'));
-    piece* foundPiece_toKill = findPiece(allPieces, final[0], int(final[1] - '0'));
-    //std::cout << "Check at palce "<<initial[0]<<" "<<int(initial[1] - '0')<<std::endl;
+    pieceToKill = findPiece(allPieces, final[0], int(final[1] - '0'));
     if (foundPiece_toMove == nullptr)
     {
         std::cout << "No piece at given place\n";
-        return false;
+        moveHappened = false;
+        return nullptr;
     }
     else
     {
-        if (foundPiece_toKill)
+        if (pieceToKill)
         {
-            if (foundPiece_toKill->isWhite == foundPiece_toMove->isWhite)
+            if (pieceToKill->isWhite == foundPiece_toMove->isWhite)
             {
                 std::cout << "Cant destroy piece of same color\n";
-                return false;
+                pieceToKill = nullptr;
+                return nullptr;
             }
-            
-            allPieces.updatePos_kill(*foundPiece_toKill, killID);
-            std::cout << "Piece destroyed\n";
-            killID++;
         }
-        allPieces.updatePos(*foundPiece_toMove, final[0], int(final[1] - '0'));
-        std::cout << "Move done\n";
-
         //Add move to history
+
+        initialPos = initial;
+        finalPos = final;
+        moveHappened = true;
         move_history += " " + initial + final;
 
-        return true;
+        return foundPiece_toMove;
     }
-
-    //Check if valid move for this
-
-    //Move
-
-    //check if destroy or checkmate
-    
-
-
 }
 
-void useKomodo(ECE_ChessEngine& chessEngine)
+piece* useKomodo(ECE_ChessEngine& chessEngine)
 {
     if (chessEngine.sendMove(move_history))
     {
@@ -738,32 +762,47 @@ void useKomodo(ECE_ChessEngine& chessEngine)
             if (responseMove == "none")
             {
                 std::cout << "Checkmate you win!!" << std::endl;
-                return;
+                return nullptr;
             }
             std::cout << "Engine move: " << responseMove << std::endl;
 
+            initialPos = responseMove.substr(0, 2);
+            finalPos = responseMove.substr(2, 2);
+
+            //cout << initialPos << " " << finalPos;
+
+            piece* foundPiece_toMove = findPiece(allPieces, initialPos[0], int(initialPos[1] - '0'));
+            pieceToKill = findPiece(allPieces, finalPos[0], int(finalPos[1] - '0'));
+
+
+            moveHappened = true;
+
+            move_history += " " + initialPos + finalPos;
+            return foundPiece_toMove;
             // Add the engine's move to moveHistory
-            toMove(responseMove.substr(0, 2), responseMove.substr(2, 2));
+            //return toMove(responseMove.substr(0, 2), responseMove.substr(2, 2));
             //move_history += " " + responseMove;
         }
     }
+    return nullptr;
 }
 
 //EDIT HERE
-void parse(string in, GLuint programID, ECE_ChessEngine& chessEngine)
+piece* parse(string in, GLuint programID, ECE_ChessEngine& chessEngine, GLuint ModelMatrixID, GLuint MatrixID, GLuint ColorID)
 {
+    moveHappened = false;
     if (in == "quit")
     {
         std::cout << "Thanks for playing!!";
         glfwSetWindowShouldClose(window, true);
-        return;
+        return nullptr;
     }
     if (in == "Play")
     {
-        if (start == 1) 
+        if (start == 1)
         {
             std::cout << "Game already in progress\n";
-            return;
+            return nullptr;
         }
         else
         {
@@ -776,38 +815,40 @@ void parse(string in, GLuint programID, ECE_ChessEngine& chessEngine)
 
             GLuint LightID = glGetUniformLocation(programID, "LightPosition_worldspace");
             glUniform3f(LightID, light.x, light.y, light.z);
+            return nullptr;
         }
-        
+
     }
-    
+
     else if (in.substr(0, 6) == "camera")
     {
         float theta = 0.0f, phi = 0.0f, r = 0.0f;
         if (sscanf_s(in.c_str(), "camera %f %f %f", &theta, &phi, &r) != 3)
         {
             std::cerr << "Some issue with input" << in << std::endl;
-            return;
+            return nullptr;
         }
         // Enforce ranges
         if (r <= 0.0f)
         {
             std::cerr << "Radius must be positive" << std::endl;
-            return;
+            return nullptr;
         }
         if (theta < 20.0f || theta > 80.0f)
         {
             std::cerr << "Theta (Horizontal Angle) must be between 20 and 80 degrees" << std::endl;
-            return;
+            return nullptr;
         }
         if (phi < 0.0f || phi > 360.0f)
         {
             std::cerr << "Phi (Vertical Angle) must be between 0 and 360 degrees" << std::endl;
-            return;
+            return nullptr;
         }
         camera.horizontalAngle = glm::radians(theta);
         camera.verticalAngle = glm::radians(phi);
         camera.radius = r;
         camera.get_Cartesian();
+        return nullptr;
     }
 
     else if (in.substr(0, 5) == "light")
@@ -816,23 +857,23 @@ void parse(string in, GLuint programID, ECE_ChessEngine& chessEngine)
         if (sscanf_s(in.c_str(), "light %f %f %f", &theta, &phi, &r) != 3)
         {
             std::cerr << "in issue " << in << std::endl;
-            return;
+            return nullptr;
         }
         // Enforce ranges
         if (r <= 0.0f)
         {
             std::cerr << "Radiusmust be positive" << std::endl;
-            return;
+            return nullptr;
         }
         if (theta < 20.0f || theta > 80.0f)
         {
             std::cerr << "Theta (Horizontal Angle) must be between 20 and 80 degrees" << std::endl;
-            return;
+            return nullptr;
         }
         if (phi < 0.0f || phi > 360.0f)
         {
             std::cerr << "Phi (Vertical Angle) must be between 0 and 360 degrees" << std::endl;
-            return;
+            return nullptr;
         }
         light.horizontalAngle = glm::radians(theta);
         light.verticalAngle = glm::radians(phi);
@@ -841,17 +882,19 @@ void parse(string in, GLuint programID, ECE_ChessEngine& chessEngine)
 
         GLuint LightID = glGetUniformLocation(programID, "LightPosition_worldspace");
         glUniform3f(LightID, light.x, light.y, light.z);
+        return nullptr;
     }
-    
+
     else if (in.substr(0, 5) == "power")
     {
         float pow = 0.0f;
         if (sscanf_s(in.c_str(), "power %f", &pow) != 1)
         {
             std::cerr << "Invalid Comamnd -> Power " << in << std::endl;
-            return;
+            return nullptr;
         }
         light.power = pow;
+        return nullptr;
     }
 
     else if (in.substr(0, 4) == "move")
@@ -861,8 +904,8 @@ void parse(string in, GLuint programID, ECE_ChessEngine& chessEngine)
         if (!std::regex_match(in, moveRegex))
         { // Check if the length is sufficient to avoid out-of-bounds 
             std::cerr << "Invalid Command -> move " << in << std::endl;
-            return;
-        }    
+            return nullptr;
+        }
         // Directly extract the move string from the input 
         move = in.substr(5); // Extracts "e2e3" // Use substr to separate initial and final positions 
         initial = move.substr(0, 2);
@@ -871,13 +914,18 @@ void parse(string in, GLuint programID, ECE_ChessEngine& chessEngine)
         if (initial == final)
         {
             std::cerr << "Initial and final position can't be same " << in << std::endl;
-            return;
+            moveHappened = false;
+
+            return nullptr;
         }
         bool move_done = false;
-        move_done = toMove(initial, final);
-        if (move_done)
+        piece* pieceToMove;
+        pieceToMove = toMove(initial, final);
+        if (pieceToMove)
         {
             myMove = true;
+            komodoMove = true;
+            return pieceToMove;
             //Sleep(1);
             //cout << "Calling Komodo\n";
             //useKomodo(chessEngine);
@@ -886,6 +934,7 @@ void parse(string in, GLuint programID, ECE_ChessEngine& chessEngine)
     else
     {
         std::cout << "Invalid command or move!!\n";
+        return nullptr;
     }
 }
 
@@ -901,7 +950,7 @@ bool loadModel(CAssimpModel& model, char* filePath)
     return true;
 }
 
-int main(void) 
+int main(void)
 {
     // Initialize GLFW
     if (!glfwInit()) {
@@ -1056,10 +1105,12 @@ int main(void)
     // Set the light position
     glUniform3f(LightID, light.x, light.y, light.z);
 
+    piece* pieceToMove;
+
+
     // Main rendering loop
     do
     {
-                
         // Get render time
         double currentTime = glfwGetTime();
         nFrames++;
@@ -1140,24 +1191,72 @@ int main(void)
         glfwSwapBuffers(window);
         glfwPollEvents();
 
-        if (!myMove)
+
+        //need to do something here
+        
+        if (!komodoMove)
         {
             if (start == 0)
                 cout << "Type Play to start: ";
             else
                 cout << "Please enter a command: ";
             std::getline(std::cin, in);
+            //Parse the string input
+            pieceToMove = parse(in, programID, chessEngine, ModelMatrixID, MatrixID, ColorID);
         }
         else
         {
-            Sleep(1000);
-            cout << "Calling Komodo\n";
-            useKomodo(chessEngine);
-            myMove = false;
+            pieceToMove = useKomodo(chessEngine);
+            komodoMove = false;
+        }
+        
+        if (moveHappened)
+        {
+            float numFiles, numRanks;
+            numRanks = (float(finalPos[1] - initialPos[1]) / 20.0) * boxSize;
+            numFiles = (float(finalPos[0] - initialPos[0]) / 20.0) * boxSize;
+
+            float x = pieceToMove->xPos;
+            float y = pieceToMove->yPos;
+
+            for (int i = 0; i < 20; i++)
+            {
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                allPieces.updatePos_animate(*pieceToMove, x, y);
+                renderAll(ModelMatrixID, MatrixID, ColorID);
+                // Chessboard rendering
+                {
+                    glm::mat4 chessboardModelMatrix = glm::mat4(1.0f);
+                    float chessboardScale = 1.0f;
+                    chessboardModelMatrix = glm::scale(chessboardModelMatrix, glm::vec3(chessboardScale));
+                    chessboardModelMatrix = glm::rotate(chessboardModelMatrix, glm::radians(90.0f),glm::vec3(0.0, 0.0, 1.0));
+                    glm::mat4 chessboardMVP = ProjectionMatrix * ViewMatrix * chessboardModelMatrix;
+                    glUniformMatrix4fv(ModelMatrixID, 1, GL_FALSE, &chessboardModelMatrix[0][0]);
+                    glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &chessboardMVP[0][0]);
+                    chessboardModel.RenderModel();
+                }
+
+                Sleep(5);
+                x -= numRanks;
+                y += numFiles;
+
+                glfwSwapBuffers(window);
+                glfwPollEvents();
+
+            }
+            //minor tweaks to final pos
+            allPieces.updatePos(*pieceToMove, finalPos[0], int(finalPos[1] - '0'));
+            pieceToMove = nullptr;
+            moveHappened = false;
+            /*komodoMove = true;*/
+            if (pieceToKill)
+            {
+                allPieces.updatePos_kill(*pieceToKill, killID);
+                killID++;
+                pieceToKill = nullptr;
+            }
         }
 
-        //Parse the string input
-        parse(in, programID, chessEngine);
 
         // Handle camera inputs
         //keyBinds();
@@ -1169,7 +1268,7 @@ int main(void)
 
     // Close OpenGL window and terminate GLFW
     glfwTerminate();
-    
+
     exit(0);
     return 0;
 }
