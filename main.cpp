@@ -35,224 +35,11 @@ using namespace glm;
 #include <memory>
 #include <cmath>
 
+#include "engine.h"
+#include "structures.h"
 using namespace std;
 
 // If line has word ponder 0000; move is illegal
-class ECE_ChessEngine {
-public:
-    ECE_ChessEngine(const std::string& path)
-        : enginePath(path), engineReady(false) {}
-
-    ~ECE_ChessEngine() {
-        cleanupEngine();
-    }
-
-    bool initializeEngine() {
-        std::cout << "Initializing engine..." << std::endl;
-
-        if (!setupPipes() || !createChildProcess()) {
-            return false;
-        }
-        std::cout << "Child process created successfully." << std::endl;
-
-        engineReady = true;
-        engineThread = std::thread(&ECE_ChessEngine::readEngineOutput, this);
-
-        return initializeUCI();
-    }
-
-    bool sendMove(const std::string& moveHistory) {
-        if (!engineReady) return false;
-        std::string command = "position startpos moves " + moveHistory + "\n";
-        return sendCommand(command) && sendCommand("go\n");
-    }
-
-    bool getResponseMove(std::string& responseMove) {
-        std::unique_lock<std::mutex> lock(engineMutex);
-        if (engineCondition.wait_for(lock, std::chrono::seconds(10),
-            [this]() { return !engineResponses.empty(); })) {
-            responseMove = engineResponses.front();
-            engineResponses.erase(engineResponses.begin());
-            return true;
-        }
-        return false;
-    }
-
-    // Function to send a generic command to the engine
-    bool sendCommand(const std::string& command) {
-        if (!engineReady) return false;
-        return writeToEngine(command);
-    }
-
-private:
-    std::string enginePath;
-    PROCESS_INFORMATION piProcInfo;
-    HANDLE childStd_IN_Rd = NULL;
-    HANDLE childStd_IN_Wr = NULL;
-    HANDLE childStd_OUT_Rd = NULL;
-    HANDLE childStd_OUT_Wr = NULL;
-    std::atomic<bool> engineReady;
-    std::thread engineThread;
-    std::mutex engineMutex;
-    std::condition_variable engineCondition;
-    std::vector<std::string> engineResponses;
-    bool uciOkReceived = false;
-    bool readyOkReceived = false;
-
-    void cleanupEngine() {
-        engineReady = false;
-        if (engineThread.joinable()) {
-            engineThread.join();
-        }
-        CloseHandle(childStd_IN_Wr);
-        CloseHandle(childStd_OUT_Rd);
-        CloseHandle(piProcInfo.hProcess);
-        CloseHandle(piProcInfo.hThread);
-    }
-
-    bool setupPipes() {
-        SECURITY_ATTRIBUTES saAttr = {};
-        saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
-        saAttr.bInheritHandle = TRUE;
-        saAttr.lpSecurityDescriptor = NULL;
-
-        if (!CreatePipe(&childStd_OUT_Rd, &childStd_OUT_Wr, &saAttr, 0) ||
-            !SetHandleInformation(childStd_OUT_Rd, HANDLE_FLAG_INHERIT, 0) ||
-            !CreatePipe(&childStd_IN_Rd, &childStd_IN_Wr, &saAttr, 0) ||
-            !SetHandleInformation(childStd_IN_Wr, HANDLE_FLAG_INHERIT, 0)) {
-            std::cerr << "Failed to set up pipes." << std::endl;
-            return false;
-        }
-
-        return true;
-    }
-
-    bool createChildProcess() {
-        ZeroMemory(&piProcInfo, sizeof(PROCESS_INFORMATION));
-
-        STARTUPINFOA siStartInfo = {};
-        ZeroMemory(&siStartInfo, sizeof(STARTUPINFOA));
-        siStartInfo.cb = sizeof(STARTUPINFOA);
-        siStartInfo.hStdError = childStd_OUT_Wr;
-        siStartInfo.hStdOutput = childStd_OUT_Wr;
-        siStartInfo.hStdInput = childStd_IN_Rd;
-        siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
-
-        std::string cmdLine = enginePath;
-        char* cmdLineMutable = &cmdLine[0];
-
-        BOOL success = CreateProcessA(
-            NULL, cmdLineMutable, NULL, NULL, TRUE,
-            CREATE_NO_WINDOW, NULL, NULL, &siStartInfo, &piProcInfo);
-
-        if (!success) {
-            reportError();
-            return false;
-        }
-
-        CloseHandle(childStd_OUT_Wr);
-        CloseHandle(childStd_IN_Rd);
-        return true;
-    }
-
-    void reportError() {
-        DWORD errorCode = GetLastError();
-        LPVOID errorMsg;
-        FormatMessageA(
-            FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-            FORMAT_MESSAGE_IGNORE_INSERTS,
-            NULL, errorCode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-            (LPSTR)&errorMsg, 0, NULL);
-        std::cerr << "CreateProcess failed with error (" << errorCode
-            << "): " << (char*)errorMsg << std::endl;
-        LocalFree(errorMsg);
-    }
-
-    bool initializeUCI() {
-        sendCommand("uci\n");
-        std::cout << "Sent 'uci' command to the engine." << std::endl;
-        if (!waitForResponse(uciOkReceived, "uciok")) {
-            return false;
-        }
-
-        sendCommand("isready\n");
-        std::cout << "Sent 'isready' command to the engine." << std::endl;
-        return waitForResponse(readyOkReceived, "readyok");
-    }
-
-    bool waitForResponse(bool& flag, const std::string& expectedResponse) {
-        std::unique_lock<std::mutex> lock(engineMutex);
-        if (!engineCondition.wait_for(lock, std::chrono::seconds(5),
-            [&flag]() { return flag; })) {
-            std::cerr << "Timeout waiting for '" << expectedResponse << "' from engine." << std::endl;
-            return false;
-        }
-        std::cout << "Received '" << expectedResponse << "' from the engine." << std::endl;
-        return true;
-    }
-
-    void readEngineOutput() {
-        DWORD bytesRead;
-        CHAR buffer[4096];
-        std::string leftover;
-
-        while (engineReady) {
-            BOOL success = ReadFile(childStd_OUT_Rd, buffer, sizeof(buffer) - 1, &bytesRead, NULL);
-            if (!success || bytesRead == 0) {
-                break;
-            }
-
-            buffer[bytesRead] = '\0';
-            std::string output(buffer);
-            output = leftover + output;
-
-            processOutput(output, leftover);
-        }
-    }
-
-    void processOutput(std::string& output, std::string& leftover) {
-        size_t pos = 0, newlinePos;
-
-        while ((newlinePos = output.find_first_of("\r\n", pos)) != std::string::npos) {
-            std::string line = output.substr(pos, newlinePos - pos);
-            processEngineOutputLine(line);
-            pos = output.find_first_not_of("\r\n", newlinePos);
-            if (pos == std::string::npos) {
-                pos = output.size();
-            }
-        }
-        leftover = output.substr(pos);
-    }
-
-    void processEngineOutputLine(const std::string& line) {
-        if (line.empty()) return;
-
-        //        std::cout << "Engine Output: " << line << std::endl;
-        std::lock_guard<std::mutex> lock(engineMutex);
-
-        if (line == "uciok") {
-            uciOkReceived = true;
-            engineCondition.notify_all();
-        }
-        else if (line == "readyok") {
-            readyOkReceived = true;
-            engineCondition.notify_all();
-        }
-        else if (line.find("bestmove") == 0) {
-            std::string bestMove = line.find("bestmove (none)") != std::string::npos
-                ? "none"
-                : line.substr(9, 4);
-            engineResponses.push_back(bestMove);
-            engineCondition.notify_all();
-        }
-    }
-
-    bool writeToEngine(const std::string& command) {
-        DWORD bytesWritten;
-        BOOL success = WriteFile(childStd_IN_Wr, command.c_str(), command.size(), &bytesWritten, NULL);
-        return success && bytesWritten == command.size();
-    }
-};
 
 
 
@@ -273,174 +60,15 @@ bool komodoMove = false;
 
 string move_history = "";
 
-//z for now
-//will use only 95 to 104
-float files[105];
-float killFile[32];
-
-//x axis
-//took 0 as spare
-float ranks[9];
-float killRank[32];
-
 // Camera parameters
-struct camera
-{
-    float radius = 50.0f;
-    float horizontalAngle = glm::radians(0.0f);
-    float verticalAngle = glm::radians(20.0f);
-
-    float x = 17.1;
-    float y = 47.0;
-    float z = 0.0;
-
-
-    void get_Cartesian()
-    {
-        x = radius * sin(verticalAngle) * cos(horizontalAngle);
-        z = radius * cos(verticalAngle);
-        y = radius * sin(verticalAngle) * sin(horizontalAngle);
-    }
-
-    //bool specularDiffuseEnabled = true;
-} camera;
+Camera camera;
 
 // Light parameters
-struct light
-{
-    float radius = 25.0f;
-    float horizontalAngle = glm::radians(25.0f);
-    float verticalAngle = glm::radians(25.0f);
+Light light;
 
-    //Values here are cartesian
-    float x = 25.0;
-    float y = 25.0;
-    float z = 25.0;
+Models pieceModels;
 
-    void get_Cartesian()
-    {
-        x = radius * sin(verticalAngle) * cos(horizontalAngle);
-        z = radius * cos(verticalAngle);
-        y = radius * sin(verticalAngle) * sin(horizontalAngle);
-    }
-
-    float power = 3000.0f;
-    //bool specularDiffuseEnabled = true;
-} light;
-
-//Components for 1 piece
-struct piece
-{
-    glm::vec3 name;
-    float xPos = 0.0f;
-    float yPos = 0.0f;
-    float zPos = 0.0f;
-
-    char file = 'a';
-    int rank = 1;
-
-    glm::vec3 pos = glm::vec3(xPos, yPos, zPos);
-
-    bool isWhite = true;
-
-    string variety = "Pawn";
-};
-
-struct models
-{
-    CAssimpModel pawnModel_dark;
-    CAssimpModel rookModel_dark;
-    CAssimpModel knightModel_dark;
-    CAssimpModel bishopModel_dark;
-    CAssimpModel queenModel_dark;
-    CAssimpModel kingModel_dark;
-    CAssimpModel pawnModel_light;
-    CAssimpModel rookModel_light;
-    CAssimpModel knightModel_light;
-    CAssimpModel bishopModel_light;
-    CAssimpModel queenModel_light;
-    CAssimpModel kingModel_light;
-} pieceModels;
-
-//Struct for all chess pieces
-struct allPiece
-{
-    //Black pieces
-    piece blackPawn1;
-    piece blackPawn2;
-    piece blackPawn3;
-    piece blackPawn4;
-    piece blackPawn5;
-    piece blackPawn6;
-    piece blackPawn7;
-    piece blackPawn8;
-
-    piece blackRook1; //Elephant
-    piece blackKnight1; //Horse
-    piece blackBishop1; //Camel
-    piece blackQueen;
-    piece blackKing;
-    piece blackBishop2;
-    piece blackKnight2;
-    piece blackRook2;
-
-    //white pieces
-    piece whitePawn1;
-    piece whitePawn2;
-    piece whitePawn3;
-    piece whitePawn4;
-    piece whitePawn5;
-    piece whitePawn6;
-    piece whitePawn7;
-    piece whitePawn8;
-
-    piece whiteRook1; //Elephant
-    piece whiteKnight1; //Horse
-    piece whiteBishop1; //Camel
-    piece whiteQueen;
-    piece whiteKing;
-    piece whiteBishop2;
-    piece whiteKnight2;
-    piece whiteRook2;
-
-    void updatePos(piece& p, char file, int rank)
-    {
-        p.file = file;
-        p.rank = rank;
-
-        p.zPos = 0.0f;
-        p.xPos = ranks[rank];
-        p.yPos = files[file];
-
-        p.pos = glm::vec3(p.xPos, p.yPos, p.zPos);
-
-        //std::cout << "Piece at r " << ranks[rank] << " file " << file <<" "<< files[file] << "\n";
-    }
-    void updatePos_kill(piece& p, int killID)
-    {
-        p.file = killID;
-        p.rank = killID;
-
-        p.zPos = 0.0f;
-        p.xPos = killRank[killID];
-        p.yPos = killFile[killID];
-
-        p.pos = glm::vec3(p.xPos, p.yPos, p.zPos);
-
-        //std::cout << "Piece at r " << ranks[rank] << " file " << file <<" "<< files[file] << "\n";
-    }
-    void updatePos_animate(piece& p, float x, float y)
-    {
-        p.zPos = 0.0f;
-        p.xPos = x;
-        p.yPos = y;
-        p.pos = glm::vec3(p.xPos, p.yPos, p.zPos);
-
-        //cout << " Positions " << p.xPos << " " << p.yPos << " " << p.zPos << endl;
-
-    }
-
-}allPieces;
+AllPieces allPieces;
 
 void initialiseBoard(GLuint programID)
 {
@@ -697,9 +325,9 @@ void keyBinds() {
     }
 }
 
-piece* findPiece(allPiece& pieces, char file, int rank)
+Piece* findPiece(AllPieces& pieces, char file, int rank)
 {
-    piece* pieceArray[] = {
+    Piece* pieceArray[] = {
         &pieces.blackPawn1, &pieces.blackPawn2, &pieces.blackPawn3, &pieces.blackPawn4, &pieces.blackPawn5, &pieces.blackPawn6, &pieces.blackPawn7, &pieces.blackPawn8,
         &pieces.blackRook1, &pieces.blackKnight1, &pieces.blackBishop1, &pieces.blackQueen, &pieces.blackKing, &pieces.blackBishop2, &pieces.blackKnight2, &pieces.blackRook2,
         &pieces.whitePawn1, &pieces.whitePawn2, &pieces.whitePawn3, &pieces.whitePawn4, &pieces.whitePawn5, &pieces.whitePawn6, &pieces.whitePawn7, &pieces.whitePawn8,
@@ -714,15 +342,15 @@ piece* findPiece(allPiece& pieces, char file, int rank)
     return nullptr;
 }
 
-piece* pieceToKill;
+Piece* pieceToKill;
 
 //Do Komodo's move as well 
-piece* toMove(string initial, string final)
+Piece* toMove(string initial, string final)
 {
     //Find piece
     int found = 0;
     int destroying = 0;
-    piece* foundPiece_toMove = findPiece(allPieces, initial[0], int(initial[1] - '0'));
+    Piece* foundPiece_toMove = findPiece(allPieces, initial[0], int(initial[1] - '0'));
     pieceToKill = findPiece(allPieces, final[0], int(final[1] - '0'));
     if (foundPiece_toMove == nullptr)
     {
@@ -752,7 +380,7 @@ piece* toMove(string initial, string final)
     }
 }
 
-piece* useKomodo(ECE_ChessEngine& chessEngine)
+Piece* useKomodo(ECE_ChessEngine& chessEngine)
 {
     if (chessEngine.sendMove(move_history))
     {
@@ -771,7 +399,7 @@ piece* useKomodo(ECE_ChessEngine& chessEngine)
 
             //cout << initialPos << " " << finalPos;
 
-            piece* foundPiece_toMove = findPiece(allPieces, initialPos[0], int(initialPos[1] - '0'));
+            Piece* foundPiece_toMove = findPiece(allPieces, initialPos[0], int(initialPos[1] - '0'));
             pieceToKill = findPiece(allPieces, finalPos[0], int(finalPos[1] - '0'));
 
 
@@ -788,7 +416,7 @@ piece* useKomodo(ECE_ChessEngine& chessEngine)
 }
 
 //EDIT HERE
-piece* parse(string in, GLuint programID, ECE_ChessEngine& chessEngine, GLuint ModelMatrixID, GLuint MatrixID, GLuint ColorID)
+Piece* parse(string in, GLuint programID, ECE_ChessEngine& chessEngine, GLuint ModelMatrixID, GLuint MatrixID, GLuint ColorID)
 {
     moveHappened = false;
     if (in == "quit")
@@ -919,7 +547,7 @@ piece* parse(string in, GLuint programID, ECE_ChessEngine& chessEngine, GLuint M
             return nullptr;
         }
         bool move_done = false;
-        piece* pieceToMove;
+        Piece* pieceToMove;
         pieceToMove = toMove(initial, final);
         if (pieceToMove)
         {
@@ -1105,7 +733,7 @@ int main(void)
     // Set the light position
     glUniform3f(LightID, light.x, light.y, light.z);
 
-    piece* pieceToMove;
+    Piece* pieceToMove;
 
 
     // Main rendering loop
