@@ -122,14 +122,14 @@ void initialiseBoard(GLuint programID)
     allPieces.blackKnight2.isWhite = false;
     allPieces.blackRook2.isWhite = false;
 
-    allPieces.blackRook1.variety    = "Rook";
-    allPieces.blackKnight1.variety  = "Knight";
-    allPieces.blackBishop1.variety  = "Bishop";
-    allPieces.blackKing.variety     = "King";
-    allPieces.blackQueen.variety    = "Queen";
-    allPieces.blackBishop2.variety  = "Bishop";
-    allPieces.blackKnight2.variety  = "Knight";
-    allPieces.blackRook2.variety    = "Rook";
+    allPieces.blackRook1.variety = "Rook";
+    allPieces.blackKnight1.variety = "Knight";
+    allPieces.blackBishop1.variety = "Bishop";
+    allPieces.blackKing.variety = "King";
+    allPieces.blackQueen.variety = "Queen";
+    allPieces.blackBishop2.variety = "Bishop";
+    allPieces.blackKnight2.variety = "Knight";
+    allPieces.blackRook2.variety = "Rook";
 
     //Whites
     allPieces.updatePos(allPieces.whitePawn1, 'a', 2);
@@ -182,7 +182,7 @@ void renderPieces(glm::vec3 piecePosition, GLuint ModelMatrixID, GLuint MatrixID
         glm::radians(60.0f),
         1024.0f / 768.0f,
         0.1f,
-        100.0f
+        300.0f
     );
 
     glm::mat4 pieceModelMatrix = glm::mat4(1.0f);
@@ -260,70 +260,70 @@ void renderAll(GLuint ModelMatrixID, GLuint MatrixID, GLuint ColorID)
 }
 
 // Function to handle camera inputs
-void keyBinds() {
-    // Camera speed
-    float cameraSpeed = 0.05f;
-    float rotationSpeed = 0.002f;
-
-    // 'W' Move close
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-    {
-        camera.radius -= cameraSpeed;
-    }
-
-    // 'S' Move farther
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-    {
-        camera.radius += cameraSpeed;
-    }
-
-    // 'A' Rotate left
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-    {
-        camera.horizontalAngle += rotationSpeed;
-    }
-
-    // 'D' Rotate right
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-    {
-        camera.horizontalAngle -= rotationSpeed;
-    }
-
-    // Up Rotate up
-    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
-    {
-        camera.verticalAngle += rotationSpeed;
-        if (camera.verticalAngle > glm::radians(89.0f)) camera.verticalAngle = glm::radians(89.0f);
-    }
-
-    // Down Rotate down
-    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
-    {
-        camera.verticalAngle -= rotationSpeed;
-        if (camera.verticalAngle < glm::radians(-89.0f)) camera.verticalAngle = glm::radians(-89.0f);
-    }
-
-    // 'L' key: Toggle specular and diffuse lighting
-    static bool lKeyPressedLastFrame = false;
-    if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
-    {
-        if (!lKeyPressedLastFrame)
-        {
-            specularDiffuseEnabled = !specularDiffuseEnabled;
-        }
-        lKeyPressedLastFrame = true;
-    }
-    else
-    {
-        lKeyPressedLastFrame = false;
-    }
-
-    // Escape key: Close the window
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-    {
-        glfwSetWindowShouldClose(window, true);
-    }
-}
+//void keyBinds() {
+//    // Camera speed
+//    float cameraSpeed = 0.05f;
+//    float rotationSpeed = 0.002f;
+//
+//    // 'W' Move close
+//    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+//    {
+//        camera.radius -= cameraSpeed;
+//    }
+//
+//    // 'S' Move farther
+//    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+//    {
+//        camera.radius += cameraSpeed;
+//    }
+//
+//    // 'A' Rotate left
+//    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+//    {
+//        camera.horizontalAngle += rotationSpeed;
+//    }
+//
+//    // 'D' Rotate right
+//    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+//    {
+//        camera.horizontalAngle -= rotationSpeed;
+//    }
+//
+//    // Up Rotate up
+//    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+//    {
+//        camera.verticalAngle += rotationSpeed;
+//        if (camera.verticalAngle > glm::radians(89.0f)) camera.verticalAngle = glm::radians(89.0f);
+//    }
+//
+//    // Down Rotate down
+//    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+//    {
+//        camera.verticalAngle -= rotationSpeed;
+//        if (camera.verticalAngle < glm::radians(-89.0f)) camera.verticalAngle = glm::radians(-89.0f);
+//    }
+//
+//    // 'L' key: Toggle specular and diffuse lighting
+//    static bool lKeyPressedLastFrame = false;
+//    if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
+//    {
+//        if (!lKeyPressedLastFrame)
+//        {
+//            specularDiffuseEnabled = !specularDiffuseEnabled;
+//        }
+//        lKeyPressedLastFrame = true;
+//    }
+//    else
+//    {
+//        lKeyPressedLastFrame = false;
+//    }
+//
+//    // Escape key: Close the window
+//    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+//    {
+//        glfwSetWindowShouldClose(window, true);
+//    }
+//}
 
 Piece* findPiece(AllPieces& pieces, char file, int rank)
 {
@@ -448,6 +448,26 @@ Piece* parse(string in, GLuint programID, ECE_ChessEngine& chessEngine, GLuint M
 
     }
 
+    else if (in == "reset")
+    {
+        //reset light
+        light.horizontalAngle = glm::radians(25.0);
+        light.verticalAngle = glm::radians(5.0);
+        light.radius = 50.0;
+        light.get_Cartesian();
+        light.power = 3000.0;
+
+        GLuint LightID = glGetUniformLocation(programID, "LightPosition_worldspace");
+        glUniform3f(LightID, light.x, light.y, light.z);
+
+        //reset camera
+        camera.horizontalAngle = glm::radians(0.0f);
+        camera.verticalAngle = glm::radians(20.0f);
+        camera.radius = 50;
+        camera.get_Cartesian();
+        return nullptr;
+    }
+
     else if (in.substr(0, 6) == "camera")
     {
         float theta = 0.0f, phi = 0.0f, r = 0.0f;
@@ -462,9 +482,9 @@ Piece* parse(string in, GLuint programID, ECE_ChessEngine& chessEngine, GLuint M
             std::cerr << "Radius must be positive" << std::endl;
             return nullptr;
         }
-        if (theta < 20.0f || theta > 80.0f)
+        if (theta < 10.0f || theta > 80.0f)
         {
-            std::cerr << "Theta (Horizontal Angle) must be between 20 and 80 degrees" << std::endl;
+            std::cerr << "Theta (Horizontal Angle) must be between 10 and 80 degrees" << std::endl;
             return nullptr;
         }
         if (phi < 0.0f || phi > 360.0f)
@@ -493,9 +513,9 @@ Piece* parse(string in, GLuint programID, ECE_ChessEngine& chessEngine, GLuint M
             std::cerr << "Radiusmust be positive" << std::endl;
             return nullptr;
         }
-        if (theta < 20.0f || theta > 80.0f)
+        if (theta < 10.0f || theta > 80.0f)
         {
-            std::cerr << "Theta (Horizontal Angle) must be between 20 and 80 degrees" << std::endl;
+            std::cerr << "Theta (Horizontal Angle) must be between 10 and 80 degrees" << std::endl;
             return nullptr;
         }
         if (phi < 0.0f || phi > 360.0f)
@@ -779,7 +799,7 @@ int main(void)
             glm::radians(60.0f),
             1024.0f / 768.0f,
             0.1f,
-            100.0f
+            300.0f
         );
 
         // Set common uniforms
@@ -821,7 +841,7 @@ int main(void)
 
 
         //need to do something here
-        
+
         if (!komodoMove)
         {
             if (start == 0)
@@ -829,6 +849,11 @@ int main(void)
             else
                 cout << "Please enter a command: ";
             std::getline(std::cin, in);
+            if (in != "Play" && start == 0)
+            {
+                cout << "ENTER \"Play\" TO START\n";
+                continue;
+            }
             //Parse the string input
             pieceToMove = parse(in, programID, chessEngine, ModelMatrixID, MatrixID, ColorID);
         }
@@ -837,17 +862,47 @@ int main(void)
             pieceToMove = useKomodo(chessEngine);
             komodoMove = false;
         }
-        
+
         if (moveHappened)
         {
             float numFiles, numRanks;
-            numRanks = (float(finalPos[1] - initialPos[1]) / 20.0) * boxSize;
-            numFiles = (float(finalPos[0] - initialPos[0]) / 20.0) * boxSize;
+            numRanks = (float(finalPos[1] - initialPos[1]) / 200.0) * boxSize;
+            numFiles = (float(finalPos[0] - initialPos[0]) / 200.0) * boxSize;
 
             float x = pieceToMove->xPos;
             float y = pieceToMove->yPos;
 
-            for (int i = 0; i < 20; i++)
+            //Only knight goes up
+            if (pieceToMove->variety == "Knight")
+            {
+                for (int i = 0; i < 25; i++)
+                {
+                    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                    allPieces.move_z(*pieceToMove, 1.0f);
+                    renderAll(ModelMatrixID, MatrixID, ColorID);
+                    // Chessboard rendering
+                    {
+                        glm::mat4 chessboardModelMatrix = glm::mat4(1.0f);
+                        float chessboardScale = 1.0f;
+                        chessboardModelMatrix = glm::scale(chessboardModelMatrix, glm::vec3(chessboardScale));
+                        chessboardModelMatrix = glm::rotate(chessboardModelMatrix, glm::radians(90.0f), glm::vec3(0.0, 0.0, 1.0));
+                        glm::mat4 chessboardMVP = ProjectionMatrix * ViewMatrix * chessboardModelMatrix;
+                        glUniformMatrix4fv(ModelMatrixID, 1, GL_FALSE, &chessboardModelMatrix[0][0]);
+                        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &chessboardMVP[0][0]);
+                        chessboardModel.RenderModel();
+                    }
+
+                    Sleep(5);
+                    x -= numRanks;
+                    y += numFiles;
+
+                    glfwSwapBuffers(window);
+                    glfwPollEvents();
+                }
+            }
+
+
+            for (int i = 0; i < 200; i++)
             {
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
                 allPieces.updatePos_animate(*pieceToMove, x, y);
@@ -857,7 +912,7 @@ int main(void)
                     glm::mat4 chessboardModelMatrix = glm::mat4(1.0f);
                     float chessboardScale = 1.0f;
                     chessboardModelMatrix = glm::scale(chessboardModelMatrix, glm::vec3(chessboardScale));
-                    chessboardModelMatrix = glm::rotate(chessboardModelMatrix, glm::radians(90.0f),glm::vec3(0.0, 0.0, 1.0));
+                    chessboardModelMatrix = glm::rotate(chessboardModelMatrix, glm::radians(90.0f), glm::vec3(0.0, 0.0, 1.0));
                     glm::mat4 chessboardMVP = ProjectionMatrix * ViewMatrix * chessboardModelMatrix;
                     glUniformMatrix4fv(ModelMatrixID, 1, GL_FALSE, &chessboardModelMatrix[0][0]);
                     glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &chessboardMVP[0][0]);
@@ -872,6 +927,36 @@ int main(void)
                 glfwPollEvents();
 
             }
+
+            //Bring knight back down
+            if (pieceToMove->variety == "Knight")
+            {
+                for (int i = 0; i < 25; i++)
+                {
+                    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                    allPieces.move_z(*pieceToMove, -1.0f);
+                    renderAll(ModelMatrixID, MatrixID, ColorID);
+                    // Chessboard rendering
+                    {
+                        glm::mat4 chessboardModelMatrix = glm::mat4(1.0f);
+                        float chessboardScale = 1.0f;
+                        chessboardModelMatrix = glm::scale(chessboardModelMatrix, glm::vec3(chessboardScale));
+                        chessboardModelMatrix = glm::rotate(chessboardModelMatrix, glm::radians(90.0f), glm::vec3(0.0, 0.0, 1.0));
+                        glm::mat4 chessboardMVP = ProjectionMatrix * ViewMatrix * chessboardModelMatrix;
+                        glUniformMatrix4fv(ModelMatrixID, 1, GL_FALSE, &chessboardModelMatrix[0][0]);
+                        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &chessboardMVP[0][0]);
+                        chessboardModel.RenderModel();
+                    }
+
+                    Sleep(5);
+                    x -= numRanks;
+                    y += numFiles;
+
+                    glfwSwapBuffers(window);
+                    glfwPollEvents();
+                }
+            }
+
             //minor tweaks to final pos
             allPieces.updatePos(*pieceToMove, finalPos[0], int(finalPos[1] - '0'));
             pieceToMove = nullptr;

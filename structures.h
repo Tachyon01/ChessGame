@@ -149,9 +149,20 @@ struct AllPieces
     }
     void updatePos_animate(Piece& p, float x, float y)
     {
-        p.zPos = 0.0f;
+        //p.zPos = 0.0f;
         p.xPos = x;
         p.yPos = y;
+        p.pos = glm::vec3(p.xPos, p.yPos, p.zPos);
+
+        //cout << " Positions " << p.xPos << " " << p.yPos << " " << p.zPos << endl;
+
+    }
+
+    void move_z(Piece& p, float i)
+    {
+        p.zPos += i;
+        //p.xPos = x;
+        //p.yPos = y;
         p.pos = glm::vec3(p.xPos, p.yPos, p.zPos);
 
         //cout << " Positions " << p.xPos << " " << p.yPos << " " << p.zPos << endl;
