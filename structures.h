@@ -8,12 +8,14 @@ Structures for storing various pieces parameters
 
 //will use only 95 to 104
 float files[105];
-float killFile[32];
+float killFileWhite[16];
+float killFileBlack[16];
 
 //x axis
 //took 0 as spare
 float ranks[9];
-float killRank[32];
+float killRankWhite[16];
+float killRankBlack[16];
 
 
 
@@ -140,9 +142,18 @@ struct AllPieces
         p.rank = killID;
 
         p.zPos = 0.0f;
-        p.xPos = killRank[killID];
-        p.yPos = killFile[killID];
 
+        if (p.isWhite)
+        {
+            p.xPos = killRankWhite[killID];
+            p.yPos = killFileWhite[killID];
+        }
+        else
+        {
+            p.xPos = killRankBlack[killID];
+            p.yPos = killFileBlack[killID];
+        }
+        
         p.pos = glm::vec3(p.xPos, p.yPos, p.zPos);
 
         //std::cout << "Piece at r " << ranks[rank] << " file " << file <<" "<< files[file] << "\n";

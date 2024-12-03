@@ -50,7 +50,8 @@ float ChessBoardSize = boxSize * 8;
 float halfChessBoardSize = ChessBoardSize / 2.0f;
 int start = 0;
 bool specularDiffuseEnabled = true;
-int killID = 0;
+int killIDWhite = 0;
+int killIDBlack = 0;
 bool myMove = false;
 
 string initialPos;
@@ -80,10 +81,14 @@ void initialiseBoard(GLuint programID)
 
         std::cout << "Rank " << i << " " << ranks[i] << " files  " << files[i + 96] << "\n";
     }
-    for (int i = 0; i < 32; i++)
+    for (int i = 0; i < 16; i++)
     {
-        killRank[i] = 1000;
-        killFile[i] = 1000;
+        killFileWhite[i] = (i < 8) ? -90 : -110;
+        killRankWhite[i] = -70 + (i % 8) * 18;
+
+        killFileBlack[i] = (i < 8) ? 90 : 110;
+        killRankBlack[i] = 70 - (i % 8) * 18;
+
     }
 
     //set pieces
@@ -866,8 +871,8 @@ int main(void)
         if (moveHappened)
         {
             float numFiles, numRanks;
-            numRanks = (float(finalPos[1] - initialPos[1]) / 200.0) * boxSize;
-            numFiles = (float(finalPos[0] - initialPos[0]) / 200.0) * boxSize;
+            numRanks = (float(finalPos[1] - initialPos[1]) / 100.0) * boxSize;
+            numFiles = (float(finalPos[0] - initialPos[0]) / 100.0) * boxSize;
 
             float x = pieceToMove->xPos;
             float y = pieceToMove->yPos;
@@ -902,7 +907,7 @@ int main(void)
             }
 
 
-            for (int i = 0; i < 200; i++)
+            for (int i = 0; i < 100; i++)
             {
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
                 allPieces.updatePos_animate(*pieceToMove, x, y);
@@ -964,8 +969,16 @@ int main(void)
             /*komodoMove = true;*/
             if (pieceToKill)
             {
-                allPieces.updatePos_kill(*pieceToKill, killID);
-                killID++;
+                if (pieceToKill->isWhite)
+                {
+                    allPieces.updatePos_kill(*pieceToKill, killIDWhite);
+                    killIDWhite++;
+                }
+                else
+                {
+                    allPieces.updatePos_kill(*pieceToKill, killIDBlack);
+                    killIDBlack++;
+                }
                 pieceToKill = nullptr;
             }
         }
